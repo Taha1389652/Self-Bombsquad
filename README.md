@@ -1,122 +1,432 @@
-# Self-Bombsquad
-یک مود سلف دارای یک عالمه قابلیت جذاب
+Self By Taha 🎮✨
 
-# 🎯 Self Mod – v3.0  
+Created by: Taha OstadSharif (@Taha_OstadSharif)
+Copyright: 2025 - ByTaha
 
-## 🇬🇧 English Description  
+A powerful all-in-one mod for BombSquad that provides smart auto-reply to chat messages and extensive features for chat management, entertainment, and game control.
 
-Self is a multifunctional mod for BombSquad created by *Taha OstadSharif*.  
-It combines auto-reply, entertainment, chat management, server utilities, and speed control, turning BombSquad into a smarter and more fun experience.  
-
-🚀 Features  
-
-💬 Auto Reply System  
-- Define triggers and send automatic replies  
-- Wildcard support  
-- Adjustable response delay  
-- Case-sensitive option  
-- Clipboard paste support  
-
-😂 Fun & Games  
-- Persian jokes  
-- Persian proverbs  
-- Short riddles  
-- Truth or Dare game (Truth & Dare questions)  
-- Dice 🎲 mini-game  
-
-🔤 Font Generator  
-Convert text into 25+ unique Unicode fonts, including:  
-Bold, Italic, Cursive, Monospace, SmallCaps, Tiny, Bubble, Squares, Wide, Circle, Negative, Gothic, Math (Bold/Italic/Fraktur/Double-Struck/Sans/Italic/…), FullWidth, Squared, and more  
-
-⚙️ Tools & Menus  
-- Quick Chat: preset messages (add, delete, reset, send instantly)  
-- Manage Triggers: add, remove, and list auto-replies  
-- Reconnect Menu: reconnect or disconnect from last server, with real-time status  
-- Server Info Panel: show IP, port, server name, and live ping (with copy button)  
-- Speed Control Panel: Normal (1.0x), Slow (0.7x), Epic Slow (0.5x), Ultra Slow (0.3x)  
-- Gregorian ↔ Jalali date conversion  
-
-🔔 Notifications  
-- Message notifications on auto-reply  
-- Sound effects when replying  
-- Option to auto-reply to self or not  
-
-🌐 Network Tools  
-- Show real IP and port of server  
-- Real Ping calculation (UDP socket)  
-- Updates every second  
-
-📝 Chat & Stickers  
-- Chat Log: view last 300 messages, search, and statistics  
-- Sticker System: save & manage stickers in JSON config  
-
-⚙️ Tune (Settings)  
-- Enable/disable auto-reply notifications  
-- Enable/disable reply sounds  
-- Toggle reply to self  
-- Case sensitivity toggle  
-- Quick access to Speed Control  
-
-📌 Summary  
-Self is an all-in-one BombSquad toolkit for both players and hosts.  
-It makes the game funnier, smarter, and more professional with features like auto-reply, mini-games, fonts, quick chat, server info, real ping, and speed control.  
 
 ---
 
-## 🇮🇷 توضیحات فارسی  
+🚀 Main Features
 
-سلف (Self) یک مود چندکاره برای بازی BombSquad است که توسط *طاها استادشریف* ساخته شده.  
-این مود ترکیبی از پاسخ خودکار، سرگرمی، مدیریت چت، ابزارهای سرور و کنترل سرعت است و تجربه‌ای هوشمندانه‌تر و جذاب‌تر از بازی ارائه می‌دهد.  
+💬 Smart Reply
 
-🚀 قابلیت‌ها  
+Custom triggers for automatic replies
 
-💬 سیستم پاسخ خودکار  
-- تعریف ماشه و ارسال پاسخ اتوماتیک  
-- پشتیبانی از Wildcard  
-- تعیین زمان تأخیر در پاسخ  
-- حساسیت به حروف بزرگ/کوچک  
-- پشتیبانی از چسباندن متن از کلیپ‌بورد  
+Wildcard support for message search
 
-😂 سرگرمی و فان  
-- جوک‌های کوتاه فارسی  
-- ضرب‌المثل‌های فارسی  
-- چیستان‌های کوتاه  
-- بازی جرئت یا حقیقت (سوالات حقیقت و چالش‌های جرئت)  
-- تاس 🎲 برای بازی و شرط‌بندی  
+Configurable delay for responses
 
-🔤 فونت‌ساز  
-تبدیل متن به بیش از 25 فونت خاص یونیکد مثل:  
-Bold، Italic، Cursive، Monospace، SmallCaps، Tiny، Bubble، Squares، Wide، Circle، Negative، Gothic، Math (Bold/Italic/Fraktur/Double-Struck/Sans/Italic/…)، FullWidth، Squared و …  
+Reply to yourself or others
 
-⚙️ ابزارها و منوها  
-- چت سریع: پیام‌های آماده برای ارسال فوری (افزودن، حذف، بازنشانی)  
-- مدیریت ماشه‌ها: اضافه، حذف و لیست پاسخ‌های خودکار  
-- منوی Reconnect: اتصال مجدد یا قطع از آخرین سرور  
-- پنل اطلاعات سرور: نمایش آی‌پی، پورت، نام سرور و پینگ زنده (به همراه دکمه کپی)  
-- کنترل سرعت بازی: Normal (1.0x)، Slow (0.7x)، Epic (0.5x)، Ultra Slow (0.3x)  
-- تبدیل تاریخ میلادی ↔ شمسی  
+Case-sensitive options
 
-🔔 اعلان‌ها  
-- نمایش اعلان هنگام پاسخ خودکار  
-- پخش صدا هنگام پاسخ  
-- امکان فعال یا غیرفعال کردن پاسخ‌دهی به خود شخص  
 
-🌐 شبکه  
-- نمایش آی‌پی و پورت واقعی سرور  
-- محاسبه و نمایش پینگ واقعی (UDP)  
-- بروزرسانی هر ثانیه  
+🎮 Fun & Game Features
 
-📝 چت و استیکر  
-- Chat Log: نمایش ۳۰۰ پیام آخر، جستجو و آمار پیام‌ها  
-- سیستم استیکر: ذخیره و مدیریت استیکرها در فایل JSON  
+Persian jokes: over 50 short and funny jokes
 
-⚙️ تنظیمات (Tune)  
-- فعال/غیرفعال کردن اعلان پاسخ  
-- فعال/غیرفعال کردن صدای پاسخ  
-- فعال/غیرفعال کردن پاسخ به خود  
-- فعال/غیرفعال کردن حساسیت به حروف  
-- دسترسی سریع به کنترل سرعت بازی  
+Persian proverbs: a treasure of wisdom
 
-📌 جمع‌بندی  
-مود سلف (Self) یک ابزار همه‌کاره برای بمب‌اسکواد است که هم سرگرمی به بازی اضافه می‌کند و هم امکانات حرفه‌ای برای مدیریت چت و سرور در اختیار قرار می‌دهد.  
-با این مود، بازی هم جالب‌تر می‌شود و هم کاربردی‌تر.
+Short riddles: over 50 riddles with answers
+
+Truth or Dare Game: 50+ Truth questions & 50+ Dare challenges
+
+Dice rolling for betting 🎲
+
+
+🔤 Advanced Font Maker
+
+Convert text into over 20 different font styles:
+Bold, Italic, Cursive, DoubleStruck, Fraktur, Parentheses, Tiny, Serif, Monospace, SmallCaps, Bubble, Squares, Wide, Circle, Negative, Script, Gothic, MathBold, MathItalic, MathBoldItalic, MathScript, MathDoubleStruck, MathFraktur, MathSans, MathSansBold, MathSansItalic, MathSansBoldItalic, SmallCaps2, FullWidth, Squared
+
+⚡ Quick Chat & Message Management
+
+Save and manage frequently used messages
+
+Add, delete, and reset messages
+
+One-click quick send
+
+JSON file storage
+
+
+🌐 Network & Server Tools
+
+Show real server info: IP, Port, Name
+
+Measure real ping via UDP socket
+
+Reconnect to server
+
+Copy server info to clipboard
+
+
+⚙️ Advanced Game Control
+
+Speed control: 4 modes: Normal (1.0x), Slow (0.7x), Epic (0.5x), Ultra Slow (0.3x)
+
+
+📊 Player Management
+
+Show full player list
+
+Detailed info per player (name, ID, device, status)
+
+Copy player info
+
+Mention players in chat
+
+Kick individual or all players
+
+
+💾 Advanced Chat Log
+
+Show last 300 messages
+
+Search and filter messages
+
+Show/hide timestamp
+
+Statistics and analytics
+
+Copy messages to clipboard
+
+
+🎭 Sticker & Emoji System
+
+Manage custom stickers
+
+Add emojis only
+
+Delete and reset stickers
+
+JSON storage
+
+Preloaded common emojis
+
+
+📅 Time & Date Tools
+
+Show current time ⏰
+
+Show Gregorian & precise Solar Hijri date 📆
+
+Support time variables in replies
+
+
+🔔 Notifications & Sounds
+
+Notify on auto-reply
+
+Ring sounds and effects
+
+Enable/disable sounds
+
+
+🛠️ Technical Features
+
+🎨 UI
+
+Modern Material Design
+
+Scrollable lists
+
+Colorful and recognizable buttons
+
+Responsive windows
+
+
+💾 Storage
+
+Use game config system for settings
+
+JSON for large data
+
+Unified configuration management
+
+
+🛡️ Anti-Spam
+
+Prevent spam with 4-second delay
+
+Smart request management
+
+Prevent duplicate messages
+
+
+🔄 Game Integration
+
+Override core connection functions
+
+Add quick access buttons
+
+
+
+---
+
+📦 How to Use
+
+1. Activate the mod in-game
+
+
+2. Access main menu via added buttons
+
+
+3. Define triggers in “Add” section
+
+
+4. Configure options in “Settings”
+
+
+5. Use features via menus
+
+
+
+
+---
+
+🎯 Use Cases
+
+Public servers: auto-reply to frequent questions
+
+Private servers: interactive fun games
+
+Competitions: dice & mini-games for betting
+
+Education: riddles & proverbs for learning
+
+Management: player and server tools
+
+
+
+---
+
+📝 Technical Notes
+
+API Version: 9
+
+Optimized large codebase
+
+Smooth performance
+
+Compatible with various BombSquad versions
+
+
+
+---
+
+نسخه فارسی 🇮🇷
+
+ساخته شده توسط: طاها استادشریف (@Taha_OstadSharif)
+حقوق نشر: 2025 - ByTaha
+
+یک مود پیشرفته و همه‌کاره برای BombSquad که قابلیت پاسخگویی خودکار به پیام‌ها و امکانات گسترده برای مدیریت چت، سرگرمی و کنترل بازی را فراهم می‌کند.
+
+
+---
+
+🚀 قابلیت‌های اصلی
+
+💬 سیستم پاسخگویی خودکار
+
+تعریف ماشه‌های سفارشی برای پاسخ خودکار
+
+پشتیبانی از Wildcard برای جستجو در متن پیام
+
+تنظیم تأخیر زمانی برای پاسخ
+
+پاسخ‌دهی به خود یا دیگران
+
+حساسیت به حروف بزرگ و کوچک
+
+
+🎮 امکانات سرگرمی و بازی
+
+جوک‌های فارسی: بیش از ۵۰ جوک کوتاه و بامزه
+
+ضرب‌المثل‌های فارسی: گنجینه‌ای از حکمت‌ها
+
+چیستان‌های کوتاه: بیش از ۵۰ چیستان جذاب با جواب
+
+بازی جرئت یا حقیقت: بیش از ۵۰ سوال Truth و ۵۰ چالش Dare
+
+تاس‌اندازی برای شرط‌بندی 🎲
+
+
+🔤 فونت‌ساز پیشرفته
+
+تبدیل متن به بیش از ۲۰ سبک فونت مختلف: Bold, Italic, Cursive, DoubleStruck, Fraktur, Parentheses, Tiny, Serif, Monospace, SmallCaps, Bubble, Squares, Wide, Circle, Negative, Script, Gothic, MathBold, MathItalic, MathBoldItalic, MathScript, MathDoubleStruck, MathFraktur, MathSans, MathSansBold, MathSansItalic, MathSansBoldItalic, SmallCaps2, FullWidth, Squared
+
+⚡ چت سریع و مدیریت پیام‌ها
+
+ذخیره و مدیریت پیام‌های پرکاربرد
+
+افزودن، حذف و بازنشانی پیام‌ها
+
+ارسال سریع با یک کلیک
+
+ذخیره در فایل JSON
+
+
+🌐 ابزارهای شبکه و سرور
+
+نمایش اطلاعات سرور واقعی: IP, پورت، نام
+
+اندازه‌گیری پینگ واقعی با سوکت UDP
+
+امکان اتصال مجدد به سرور
+
+کپی اطلاعات سرور به کلیپ‌بورد
+
+
+⚙️ کنترل پیشرفته بازی
+
+کنترل سرعت بازی: ۴ حالت مختلف (عادی، اسلو، آپیک، اولترا اسلو)
+
+
+📊 مدیریت بازیکنان
+
+نمایش لیست کامل بازیکنان
+
+اطلاعات دقیق هر بازیکن (نام، ID، دستگاه، وضعیت)
+
+کپی اطلاعات بازیکنان
+
+منشن کردن بازیکنان در چت
+
+اخراج فردی یا گروهی بازیکنان
+
+
+💾 سیستم چت لاگ پیشرفته
+
+نمایش ۳۰۰ پیام آخر
+
+جستجو و فیلتر پیام‌ها
+
+نمایش/مخفی کردن زمان ارسال
+
+آمار و آنالیز پیام‌ها
+
+کپی پیام‌ها به کلیپ‌بورد
+
+
+🎭 سیستم استیکر و ایموجی
+
+مدیریت استیکرهای دلخواه
+
+افزودن فقط ایموجی
+
+حذف و بازنشانی استیکرها
+
+ذخیره در JSON
+
+استیکرهای پیش‌فرض شامل ایموجی‌های پرکاربرد
+
+
+📅 امکانات زمانی و تاریخ
+
+نمایش زمان فعلی ⏰
+
+تاریخ میلادی و شمسی دقیق 📆
+
+پشتیبانی از متغیرهای زمانی در پاسخ‌ها
+
+
+🔔 سیستم اعلان و صدا
+
+اعلان هنگام پاسخ خودکار
+
+صدای زنگ و افکت‌ها
+
+قابلیت فعال/غیرفعال کردن صداها
+
+
+🛠️ قابلیت‌های فنی
+
+🎨 رابط کاربری
+
+طراحی مدرن و متریال
+
+اسکرول برای لیست‌های طولانی
+
+دکمه‌های رنگی و قابل تشخیص
+
+پنجره‌های واکنش‌گرا
+
+
+💾 ذخیره‌سازی
+
+استفاده از سیستم کانفیگ بازی
+
+فایل JSON برای داده‌های حجیم
+
+مدیریت یکپارچه پیکربندی
+
+
+🛡️ آنتی اسپم
+
+جلوگیری از اسپم با تأخیر ۴ ثانیه‌ای
+
+مدیریت هوشمند درخواست‌ها
+
+جلوگیری از ارسال پیام‌های تکراری
+
+
+🔄 یکپارچه‌سازی با بازی
+
+اورراید توابع اصلی اتصال
+
+افزودن دکمه‌های دسترسی سریع
+
+
+
+---
+
+📦 نحوه استفاده
+
+1. فعال کردن مود در بازی
+
+
+2. دسترسی به منوی اصلی از طریق دکمه‌های اضافه شده
+
+
+3. تعریف ماشه‌ها در بخش "افزودن"
+
+
+4. تنظیم موارد دلخواه در "تنظیمات"
+
+
+5. استفاده از امکانات مختلف
+
+
+
+
+---
+
+🎯 موارد استفاده
+
+سرورهای عمومی: پاسخ خودکار به سوالات پرتکرار
+
+سرورهای خصوصی: بازی‌های تعاملی و سرگرمی
+
+مسابقات: تاس و بازی‌ها برای شرط‌بندی
+
+آموزش: چیستان و ضرب‌المثل
+
+مدیریت: ابزارهای مدیریت بازیکنان و سرور
+
+
+
+---
+
+📝 نکات فنی
+
+نسخه API: 9
+
+حجم کد: گسترده و بهینه
+
+اجرای روان و بهینه
+
+سازگار با نسخه‌های مختلف BombSquad
