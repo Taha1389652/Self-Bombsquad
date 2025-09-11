@@ -2713,6 +2713,293 @@ class FontMaker:
             gs('dingSmall').play()
         except:
             AR.err("کلیپ‌بورد پشتیبانی نمی‌شود!")
+            
+"""اطلاعات بازیکنان - عرض بزرگتر، ارتفاع کمتر"""
+class PlayerInfo:
+    def __init__(s, source):
+        # ویندوز با عرض 600 و ارتفاع 320
+        w = s.w = AR.cw(
+            source=source,
+            size=(600, 320),
+            ps=AR.UIS()*0.7
+        )
+        # دکمه بستن
+        AR.add_close_button(w, position=(570, 285))
+
+        # عنوان
+        tw(
+            parent=w,
+            text='👥 اطلاعات بازیکنان',
+            scale=1.1,
+            position=(280, 270),  # مرکز پنجره جدید
+            h_align='center',
+            color=(0, 1, 1)
+        )
+
+        # دریافت لیست بازیکنان
+        s.players = s.get_players()
+
+        # اسکرول با عرض بیشتر
+        s.scroll = sw(
+            parent=w,
+            size=(560, 200),
+            position=(20, 50)
+        )
+
+        s.container = cw(
+            parent=s.scroll,
+            size=(560, len(s.players) * 45),
+            background=False
+        )
+
+        # دکمه‌های مدیریت
+        buttons = [
+            ('🔄 بروزرسانی', s.refresh_players, (30, 20), (120, 30)),
+            ('📋 کپی همه', s.copy_all_info, (250, 20), (120, 30)),
+            ('🚫 اخراج همه', s.kick_all, (450, 20), (120, 30))
+        ]
+        
+        for label, callback, pos, size in buttons:
+            bw(
+                parent=w,
+                label=label,
+                size=size,
+                position=pos,
+                on_activate_call=callback,
+                color=(0.3, 0.5, 0.8),
+                text_scale=0.8,
+                textcolor=(1, 1, 1)
+            )
+
+        s.display_players()
+        AR.swish()
+
+    def get_players(s):
+        players = []
+        try:
+            roster = bs.get_game_roster()
+            for player in roster:
+                if 'players' in player and player['players']:
+                    for p in player['players']:
+                        device_name = player.get('display_string', 'دستگاه ناشناس')
+                        players.append({
+                            'name': p.get('name', 'بازیکن ناشناس'),
+                            'full_name': p.get('name_full', 'بازیکن ناشناس'),
+                            'client_id': player.get('client_id', -1),
+                            'is_host': player.get('client_id', -1) == -1,
+                            'device': device_name
+                        })
+        except Exception:
+            pass
+        return players
+
+    def display_players(s):
+        for child in s.container.get_children():
+            child.delete()
+
+        if not s.players:
+            tw(
+                parent=s.container,
+                text='⚠️ بازیکنی یافت نشد',
+                position=(280, 90),
+                scale=0.8,
+                color=(1, 0.5, 0),
+                h_align='center'
+            )
+            return
+
+        # هدرهای ستون‌ها با عرض جدید
+        headers = [
+            ('نام بازیکن', 30, 0.6, (1, 1, 1)),
+            ('ID', 120, 0.6, (0.8, 0.8, 1)),
+            ('دستگاه', 170, 0.6, (0.6, 1, 0.6)),
+            ('وضعیت', 300, 0.6, (1, 1, 0.8)),
+            ('عملیات', 440, 0.6, (1, 1, 1))
+        ]
+
+        y_pos = len(s.players) * 40 + 20
+        for text, x, scale, color in headers:
+            tw(
+                parent=s.container,
+                text=text,
+                position=(x, y_pos),
+                scale=scale,
+                color=color,
+                h_align='center'
+            )
+
+        y_pos = len(s.players) * 40 - 15
+        for i, player in enumerate(s.players):
+            bg_color = (0.2, 0.2, 0.3) if i % 2 == 0 else (0.25, 0.25, 0.35)
+            
+            # پس‌زمینه ردیف
+            bw(
+                parent=s.container, 
+                label='', 
+                size=(540, 35),  # عرض بزرگتر مطابق با کانتینر
+                position=(10, y_pos), 
+                color=bg_color, 
+                enable_sound=False
+            )
+
+            # نام بازیکن
+            pname = player['name'][:18] + '...' if len(player['name']) > 18 else player['name']
+            if player['is_host']:
+                pname = f"👑 {pname}"
+            
+            tw(
+                parent=s.container, 
+                text=pname,
+                position=(20, y_pos + 5), 
+                scale=0.65,
+                color=(1, 1, 1), 
+                maxwidth=160,  # کمی بزرگتر
+                h_align='left'
+            )
+
+            # ID بازیکن
+            tw(
+                parent=s.container, 
+                text=f"{player['client_id']}",
+                position=(120, y_pos + 5), 
+                scale=0.6,
+                color=(0.8, 0.8, 1), 
+                h_align='center'
+            )
+
+            # نام دستگاه
+            device_text = player['device'][:18] + '...' if len(player['device']) > 18 else player['device']
+            tw(
+                parent=s.container, 
+                text=device_text,
+                position=(160, y_pos + 5), 
+                scale=0.55,
+                color=(0.6, 1, 0.6), 
+                maxwidth=140, 
+                h_align='left'
+            )
+
+            # وضعیت میزبان
+            status_text = "میزبان" if player['is_host'] else "بازیکن"
+            status_color = (1, 1, 0) if player['is_host'] else (0.8, 0.8, 1)
+            tw(
+                parent=s.container, 
+                text=status_text,
+                position=(300, y_pos + 5), 
+                scale=0.6,
+                color=status_color, 
+                h_align='center'
+            )
+
+            # اکشن‌ها
+            actions = [
+                ('📋', s.copy_player_info, (400, y_pos + 5), player),
+                ('@', s.mention_player, (450, y_pos + 5), player),
+                ('🚫', s.kick_player, (500, y_pos + 5), player)
+            ]
+            
+            for label, callback, pos, data in actions:
+                bw(
+                    parent=s.container, 
+                    label=label, 
+                    size=(25, 25),
+                    position=pos, 
+                    on_activate_call=Call(callback, data),
+                    color=(0.3, 0.5, 0.8), 
+                    text_scale=0.6
+                )
+
+            y_pos -= 40
+
+        cw(s.container, size=(540, len(s.players) * 40 + 40))
+
+    def refresh_players(s):
+        s.players = s.get_players()
+        s.display_players()
+        push('🔄 لیست بازیکنان بروزرسانی شد', color=(0, 1, 0))
+        gs('dingSmall').play()
+
+    def copy_player_info(s, player):
+        info = (f"نام بازیکن: {player['name']}\n"
+                f"شناسه: {player['client_id']}\n"
+                f"دستگاه: {player['device']}\n"
+                f"وضعیت: {'میزبان' if player['is_host'] else 'بازیکن'}")
+        
+        if CIS():
+            from babase import clipboard_set_text
+            clipboard_set_text(info)
+            push(f'📋 اطلاعات {player["name"]} کپی شد', color=(0, 1, 0))
+            gs('dingSmall').play()
+        else:
+            AR.err('❌ کلیپ‌بورد پشتیبانی نمی‌شود!')
+
+    def copy_all_info(s):
+        if not s.players:
+            AR.err('❌ بازیکنی برای کپی وجود ندارد!')
+            return
+            
+        all_info = "👥 لیست بازیکنان:\n\n"
+        for player in s.players:
+            status = "👑 میزبان" if player['is_host'] else "👤 بازیکن"
+            all_info += f"• {player['name']} (ID: {player['client_id']}) - {player['device']} - {status}\n"
+        
+        if CIS():
+            from babase import clipboard_set_text
+            clipboard_set_text(all_info)
+            push('📋 اطلاعات همه بازیکنان کپی شد', color=(0, 1, 0))
+            gs('dingSmallHigh').play()
+        else:
+            AR.err('❌ کلیپ‌بورد پشتیبانی نمی‌شود!')
+
+    def mention_player(s, player):
+        try:
+            message = f"@{player['name']}"
+            CM(message)
+            push(f"📍 {player['name']} منشن شد", color=(0, 1, 1))
+            gs('dingSmall').play()
+        except Exception:
+            AR.err(f"❌ خطا در ارسال منشن")
+
+    def kick_player(s, player):
+        if player['is_host']:
+            AR.err('❌ نمی‌توان میزبان را اخراج کرد!')
+            return
+        
+        try:
+            from bascenev1 import disconnect_client
+            disconnect_client(player['client_id'])
+            push(f"🚫 {player['name']} اخراج شد", color=(1, 0.5, 0))
+            gs('dingSmallLow').play()
+            teck(1.0, s.refresh_players)
+        except Exception:
+            AR.err(f"❌ خطا در اخراج")
+
+    def kick_all(s):
+        if not s.players:
+            AR.err('❌ بازیکنی برای اخراج وجود ندارد!')
+            return
+            
+        try:
+            from bascenev1 import disconnect_client
+            kicked_count = 0
+            
+            for player in s.players:
+                if not player['is_host']:
+                    try:
+                        disconnect_client(player['client_id'])
+                        kicked_count += 1
+                    except:
+                        continue
+            
+            if kicked_count > 0:
+                push(f"🚫 {kicked_count} بازیکن اخراج شدند", color=(1, 0.5, 0))
+                gs('dingSmallLow').play()
+                teck(1.0, s.refresh_players)
+            else:
+                AR.err('❌ هیچ بازیکنی برای اخراج وجود ندارد!')
+                
+        except Exception:
+            AR.err(f"❌ خطا در اخراج گروهی")
 
 # ba_meta require api 9
 # ba_meta export plugin
@@ -2732,6 +3019,17 @@ class byTaha(Plugin):
         o = party.PartyWindow.__init__
         def e(s,*a,**k):
             r = o(s,*a,**k)
+            
+                        # دکمه اطلاعات بازیکنان - بالای فونت ساز
+            b_playerinfo = AR.bw(
+                icon=gt('ouyaOButton'),
+                position=(s._width+10, s._height-176),  # بالای فونت ساز
+                parent=s._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='بازیکنان'
+            )
+            bw(b_playerinfo, on_activate_call=Call(PlayerInfo, source=b_playerinfo))
             
             # دکمه چت لاگ - بالای استیکر
             b_chatlog = AR.bw(
