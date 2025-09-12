@@ -38,6 +38,9 @@ from _babase import get_string_width as strw
 from datetime import datetime as DT
 from bauiv1lib import party
 from babase import apptimer as teck
+from bauiv1lib.popup import PopupWindow, PopupMenu
+from typing import Sequence, Tuple, Optional, Callable
+from bauiv1lib.colorpicker import ColorPicker
 import random
 import math
 import json
@@ -45,6 +48,10 @@ import os
 import socket
 import threading
 import time
+import bascenev1 as bs
+import bauiv1 as bui
+import _babase
+import babase
 import bascenev1 as bs
 import bauiv1 as bui
 
@@ -482,6 +489,13 @@ current_ping = 0.0
 server_ip = "127.0.0.1"
 server_port = 43210
 server_name = "Local Server"
+
+# تعریف متغیرهای global
+original_buttonwidget = bui.buttonwidget
+original_containerwidget = bui.containerwidget
+original_checkboxwidget = bui.checkboxwidget
+original_have_pro = None
+original_add_transaction = bui.app.plus.add_v1_account_transaction
 
 # اورراید کردن تابع connect برای گرفتن آیپی واقعی
 def new_connect_to_party(address, port=43210, print_progress=False):
@@ -3000,6 +3014,766 @@ class PlayerInfo:
                 
         except Exception:
             AR.err(f"❌ خطا در اخراج گروهی")
+            
+"""تغییر رنگ UI"""
+class UIColorChanger:
+    def __init__(s, source):
+        # فقط مستقیماً پنجره تغییر رنگ را باز کن
+        launch_colorscheme_selection_window()
+
+class ColorScheme:
+    """
+    Apply a colorscheme to the game.
+    """
+
+    def __init__(self, color=None, highlight=None):
+        self.color = color
+        self.highlight = highlight
+
+    def _custom_buttonwidget(self, *args, **kwargs):
+        if self.highlight is not None:
+            kwargs["color"] = self.highlight
+        return original_buttonwidget(*args, **kwargs)
+
+    def _custom_containerwidget(self, *args, **kwargs):
+        if self.color is not None:
+            kwargs["color"] = self.color
+        return original_containerwidget(*args, **kwargs)
+
+    def _custom_checkboxwidget(self, *args, **kwargs):
+        if self.highlight is not None:
+            kwargs["color"] = self.highlight
+        return original_checkboxwidget(*args, **kwargs)
+
+    def _apply_color(self):
+        if self.color is not None:
+            bui.containerwidget = self._custom_containerwidget
+
+    def _apply_highlight(self):
+        if self.highlight is not None:
+            bui.buttonwidget = self._custom_buttonwidget
+            bui.checkboxwidget = self._custom_checkboxwidget
+
+    def apply(self):
+        if self.color:
+            self._apply_color()
+        if self.highlight:
+            self._apply_highlight()
+
+    @staticmethod
+    def _disable_color():
+        bui.buttonwidget = original_buttonwidget
+        bui.checkboxwidget = original_checkboxwidget
+
+    @staticmethod
+    def _disable_highlight():
+        bui.containerwidget = original_containerwidget
+
+    @classmethod
+    def disable(cls):
+        cls._disable_color()
+        cls._disable_highlight()
+
+class ColorSchemeWindow(bui.Window):
+    def __init__(self, default_colors=((0.41, 0.39, 0.5), (0.5, 0.7, 0.25))):
+        self._default_colors = default_colors
+        self._color, self._highlight = babase.app.config.get("ColorScheme", (None, None))
+
+        self._last_color = self._color
+        self._last_highlight = self._highlight
+
+        ColorScheme.disable()
+
+        # Allow pro features for color picking
+        global original_have_pro
+        original_have_pro = bui.app.classic.accounts.have_pro
+        bui.app.classic.accounts.have_pro = lambda: True
+
+        self.draw_ui()
+
+    def draw_ui(self):
+        uiscale = bui.app.ui_v1.uiscale
+        self._width = width = 480.0 if uiscale is babase.UIScale.SMALL else 380.0
+        self._x_inset = x_inset = 40.0 if uiscale is babase.UIScale.SMALL else 0.0
+        self._height = height = (
+            275.0
+            if uiscale is babase.UIScale.SMALL
+            else 288.0
+            if uiscale is babase.UIScale.MEDIUM
+            else 300.0
+        )
+        spacing = 40
+        self._base_scale = (
+            2.05
+            if uiscale is babase.UIScale.SMALL
+            else 1.5
+            if uiscale is babase.UIScale.MEDIUM
+            else 1.0
+        )
+        top_extra = 15
+
+        super().__init__(
+            root_widget=bui.containerwidget(
+                size=(width, height + top_extra),
+                on_outside_click_call=self.cancel_on_outside_click,
+                transition="in_right",
+                scale=self._base_scale,
+                stack_offset=(0, 15) if uiscale is babase.UIScale.SMALL else (0, 0),
+            )
+        )
+
+        cancel_button = bui.buttonwidget(
+            parent=self._root_widget,
+            position=(52 + x_inset, height - 60),
+            size=(155, 60),
+            scale=0.8,
+            autoselect=True,
+            label=babase.Lstr(resource="cancelText"),
+            on_activate_call=self._cancel,
+        )
+        bui.containerwidget(edit=self._root_widget, cancel_button=cancel_button)
+
+        save_button = bui.buttonwidget(
+            parent=self._root_widget,
+            position=(width - (177 + x_inset), height - 110),
+            size=(155, 60),
+            autoselect=True,
+            scale=0.8,
+            label=babase.Lstr(resource="saveText"),
+        )
+        bui.widget(edit=save_button, left_widget=cancel_button)
+        bui.buttonwidget(edit=save_button, on_activate_call=self.save)
+        bui.widget(edit=cancel_button, right_widget=save_button)
+        bui.containerwidget(edit=self._root_widget, start_button=save_button)
+
+        reset_button = bui.buttonwidget(
+            parent=self._root_widget,
+            position=(width - (177 + x_inset), height - 60),
+            size=(155, 60),
+            color=(0.2, 0.5, 0.6),
+            autoselect=True,
+            scale=0.8,
+            label=babase.Lstr(resource="settingsWindowAdvanced.resetText"),
+        )
+        bui.widget(edit=reset_button, left_widget=reset_button)
+        bui.buttonwidget(edit=reset_button, on_activate_call=self.reset)
+        bui.widget(edit=cancel_button, right_widget=reset_button)
+        bui.containerwidget(edit=self._root_widget, start_button=reset_button)
+
+        v = height - 65.0
+        v -= spacing * 3.0
+        b_size = 80
+        b_offs = 75
+
+        self._color_button = bui.buttonwidget(
+            parent=self._root_widget,
+            autoselect=True,
+            position=(self._width * 0.5 - b_offs - b_size * 0.5, v - 50),
+            size=(b_size, b_size),
+            color=self._last_color or self._default_colors[0],
+            label="",
+            button_type="square",
+        )
+        bui.buttonwidget(
+            edit=self._color_button, on_activate_call=babase.Call(self._pick_color, "color")
+        )
+        bui.textwidget(
+            parent=self._root_widget,
+            h_align="center",
+            v_align="center",
+            position=(self._width * 0.5 - b_offs, v - 65),
+            size=(0, 0),
+            draw_controller=self._color_button,
+            text=babase.Lstr(resource="editProfileWindow.colorText"),
+            scale=0.7,
+            color=bui.app.ui_v1.title_color,
+            maxwidth=120,
+        )
+
+        self._highlight_button = bui.buttonwidget(
+            parent=self._root_widget,
+            autoselect=True,
+            position=(self._width * 0.5 + b_offs - b_size * 0.5, v - 50),
+            size=(b_size, b_size),
+            color=self._last_highlight or self._default_colors[1],
+            label="",
+            button_type="square",
+        )
+
+        bui.buttonwidget(
+            edit=self._highlight_button,
+            on_activate_call=babase.Call(self._pick_color, "highlight"),
+        )
+        bui.textwidget(
+            parent=self._root_widget,
+            h_align="center",
+            v_align="center",
+            position=(self._width * 0.5 + b_offs, v - 65),
+            size=(0, 0),
+            draw_controller=self._highlight_button,
+            text=babase.Lstr(resource="editProfileWindow.highlightText"),
+            scale=0.7,
+            color=bui.app.ui_v1.title_color,
+            maxwidth=120,
+        )
+
+    def _pick_color(self, tag):
+        if tag == "color":
+            initial_color = self._color or self._default_colors[0]
+        elif tag == "highlight":
+            initial_color = self._highlight or self._default_colors[1]
+        else:
+            raise ValueError("Unexpected color picker tag: {}".format(tag))
+        ColorPicker(
+            parent=self._root_widget,
+            position=(0, 0),
+            initial_color=initial_color,
+            delegate=self,
+            tag=tag,
+        )
+
+    def cancel_on_outside_click(self):
+        bui.getsound("swish").play()
+        self._cancel()
+
+    def _cancel(self):
+        if self._last_color and self._last_highlight:
+            colorscheme = ColorScheme(self._last_color, self._last_highlight)
+            colorscheme.apply()
+        # Restore original pro check
+        bui.app.classic.accounts.have_pro = original_have_pro
+        bui.containerwidget(edit=self._root_widget, transition="out_right")
+
+    def reset(self, transition_out=True):
+        if transition_out:
+            bui.getsound("gunCocking").play()
+        babase.app.config["ColorScheme"] = (None, None)
+        # Restore original pro check
+        bui.app.classic.accounts.have_pro = original_have_pro
+        babase.app.config.commit()
+        bui.containerwidget(edit=self._root_widget, transition="out_right")
+
+    def save(self, transition_out=True):
+        if transition_out:
+            bui.getsound("gunCocking").play()
+        colorscheme = ColorScheme(
+            self._color or self._default_colors[0],
+            self._highlight or self._default_colors[1],
+        )
+        colorscheme.apply()
+        # Restore original pro check
+        bui.app.classic.accounts.have_pro = original_have_pro
+        babase.app.config["ColorScheme"] = (
+            self._color or self._default_colors[0],
+            self._highlight or self._default_colors[1],
+        )
+        babase.app.config.commit()
+        bui.containerwidget(edit=self._root_widget, transition="out_right")
+
+    def _set_color(self, color):
+        self._color = color
+        if self._color_button:
+            bui.buttonwidget(edit=self._color_button, color=color)
+
+    def _set_highlight(self, color):
+        self._highlight = color
+        if self._highlight_button:
+            bui.buttonwidget(edit=self._highlight_button, color=color)
+
+    def color_picker_selected_color(self, picker, color):
+        if not self._root_widget:
+            return
+        tag = picker.get_tag()
+        if tag == "color":
+            self._set_color(color)
+        elif tag == "highlight":
+            self._set_highlight(color)
+
+    def color_picker_closing(self, picker):
+        pass
+
+def launch_colorscheme_selection_window():
+    ColorSchemeWindow()
+
+def load_colorscheme():
+    color, highlight = babase.app.config.get("ColorScheme", (None, None))
+    if color and highlight:
+        colorscheme = ColorScheme(color, highlight)
+        colorscheme.apply()
+
+# بارگذاری پلاگین رنگ‌ها هنگام راه‌اندازی
+load_colorscheme()
+
+class ColorSchemeWindow(bui.Window):
+    def __init__(self, default_colors=((0.41, 0.39, 0.5), (0.5, 0.7, 0.25))):
+        self._default_colors = default_colors
+        self._color, self._highlight = babase.app.config.get("ColorScheme", (None, None))
+
+        self._last_color = self._color
+        self._last_highlight = self._highlight
+
+        # Let's set the game's default colorscheme before opening the Window.
+        # Otherwise the colors in the Window are tinted as per the already
+        # applied custom colorscheme thereby making it impossible to visually
+        # differentiate between different colors.
+        ColorScheme.disable()
+
+        # A hack to let players select any RGB color value through the UI,
+        # otherwise this is limited only to pro accounts.
+        bui.app.classic.accounts.have_pro = lambda: True
+
+        self.draw_ui()
+
+    def draw_ui(self):
+        # NOTE: Most of the stuff here for drawing the UI is referred from the
+        # legacy (1.6 < version <= 1.7.19) game's bastd/ui/profile/edit.py, and
+        # so there could be some cruft here due to my oversight.
+        uiscale = bui.app.ui_v1.uiscale
+        self._width = width = 480.0 if uiscale is babase.UIScale.SMALL else 380.0
+        self._x_inset = x_inset = 40.0 if uiscale is babase.UIScale.SMALL else 0.0
+        self._height = height = (
+            275.0
+            if uiscale is babase.UIScale.SMALL
+            else 288.0
+            if uiscale is babase.UIScale.MEDIUM
+            else 300.0
+        )
+        spacing = 40
+        self._base_scale = (
+            2.05
+            if uiscale is babase.UIScale.SMALL
+            else 1.5
+            if uiscale is babase.UIScale.MEDIUM
+            else 1.0
+        )
+        top_extra = 15
+
+        super().__init__(
+            root_widget=bui.containerwidget(
+                size=(width, height + top_extra),
+                on_outside_click_call=self.cancel_on_outside_click,
+                transition="in_right",
+                scale=self._base_scale,
+                stack_offset=(0, 15) if uiscale is babase.UIScale.SMALL else (0, 0),
+            )
+        )
+
+        cancel_button = bui.buttonwidget(
+            parent=self._root_widget,
+            position=(52 + x_inset, height - 60),
+            size=(155, 60),
+            scale=0.8,
+            autoselect=True,
+            label=babase.Lstr(resource="cancelText"),
+            on_activate_call=self._cancel,
+        )
+        bui.containerwidget(edit=self._root_widget, cancel_button=cancel_button)
+
+        save_button = bui.buttonwidget(
+            parent=self._root_widget,
+            position=(width - (177 + x_inset), height - 110),
+            size=(155, 60),
+            autoselect=True,
+            scale=0.8,
+            label=babase.Lstr(resource="saveText"),
+        )
+        bui.widget(edit=save_button, left_widget=cancel_button)
+        bui.buttonwidget(edit=save_button, on_activate_call=self.save)
+        bui.widget(edit=cancel_button, right_widget=save_button)
+        bui.containerwidget(edit=self._root_widget, start_button=save_button)
+
+        reset_button = bui.buttonwidget(
+            parent=self._root_widget,
+            position=(width - (177 + x_inset), height - 60),
+            size=(155, 60),
+            color=(0.2, 0.5, 0.6),
+            autoselect=True,
+            scale=0.8,
+            label=babase.Lstr(resource="settingsWindowAdvanced.resetText"),
+        )
+        bui.widget(edit=reset_button, left_widget=reset_button)
+        bui.buttonwidget(edit=reset_button, on_activate_call=self.reset)
+        bui.widget(edit=cancel_button, right_widget=reset_button)
+        bui.containerwidget(edit=self._root_widget, start_button=reset_button)
+
+        v = height - 65.0
+        v -= spacing * 3.0
+        b_size = 80
+        b_offs = 75
+
+        self._color_button = bui.buttonwidget(
+            parent=self._root_widget,
+            autoselect=True,
+            position=(self._width * 0.5 - b_offs - b_size * 0.5, v - 50),
+            size=(b_size, b_size),
+            color=self._last_color or self._default_colors[0],
+            label="",
+            button_type="square",
+        )
+        bui.buttonwidget(
+            edit=self._color_button, on_activate_call=babase.Call(self._pick_color, "color")
+        )
+        bui.textwidget(
+            parent=self._root_widget,
+            h_align="center",
+            v_align="center",
+            position=(self._width * 0.5 - b_offs, v - 65),
+            size=(0, 0),
+            draw_controller=self._color_button,
+            text=babase.Lstr(resource="editProfileWindow.colorText"),
+            scale=0.7,
+            color=bui.app.ui_v1.title_color,
+            maxwidth=120,
+        )
+
+        self._highlight_button = bui.buttonwidget(
+            parent=self._root_widget,
+            autoselect=True,
+            position=(self._width * 0.5 + b_offs - b_size * 0.5, v - 50),
+            size=(b_size, b_size),
+            color=self._last_highlight or self._default_colors[1],
+            label="",
+            button_type="square",
+        )
+
+        bui.buttonwidget(
+            edit=self._highlight_button,
+            on_activate_call=babase.Call(self._pick_color, "highlight"),
+        )
+        bui.textwidget(
+            parent=self._root_widget,
+            h_align="center",
+            v_align="center",
+            position=(self._width * 0.5 + b_offs, v - 65),
+            size=(0, 0),
+            draw_controller=self._highlight_button,
+            text=babase.Lstr(resource="editProfileWindow.highlightText"),
+            scale=0.7,
+            color=bui.app.ui_v1.title_color,
+            maxwidth=120,
+        )
+
+    def _pick_color(self, tag):
+        if tag == "color":
+            initial_color = self._color or self._default_colors[0]
+        elif tag == "highlight":
+            initial_color = self._highlight or self._default_colors[1]
+        else:
+            raise ValueError("Unexpected color picker tag: {}".format(tag))
+        ColorPicker(
+            parent=None,
+            position=(0, 0),
+            initial_color=initial_color,
+            delegate=self,
+            tag=tag,
+        )
+
+    def cancel_on_outside_click(self):
+        bui.getsound("swish").play()
+        self._cancel()
+
+    def _cancel(self):
+        if self._last_color and self._last_highlight:
+            colorscheme = ColorScheme(self._last_color, self._last_highlight)
+            colorscheme.apply()
+        # Good idea to revert this back now so we do not break anything else.
+        bui.app.classic.accounts.have_pro = original_have_pro
+        bui.containerwidget(edit=self._root_widget, transition="out_right")
+
+    def reset(self, transition_out=True):
+        if transition_out:
+            bui.getsound("gunCocking").play()
+        babase.app.config["ColorScheme"] = (None, None)
+        # Good idea to revert this back now so we do not break anything else.
+        bui.app.classic.accounts.have_pro = original_have_pro
+        babase.app.config.commit()
+        bui.containerwidget(edit=self._root_widget, transition="out_right")
+
+    def save(self, transition_out=True):
+        if transition_out:
+            bui.getsound("gunCocking").play()
+        colorscheme = ColorScheme(
+            self._color or self._default_colors[0],
+            self._highlight or self._default_colors[1],
+        )
+        colorscheme.apply()
+        # Good idea to revert this back now so we do not break anything else.
+        bui.app.classic.accounts.have_pro = original_have_pro
+        babase.app.config["ColorScheme"] = (
+            self._color or self._default_colors[0],
+            self._highlight or self._default_colors[1],
+        )
+        babase.app.config.commit()
+        bui.containerwidget(edit=self._root_widget, transition="out_right")
+
+    def _set_color(self, color):
+        self._color = color
+        if self._color_button:
+            bui.buttonwidget(edit=self._color_button, color=color)
+
+    def _set_highlight(self, color):
+        self._highlight = color
+        if self._highlight_button:
+            bui.buttonwidget(edit=self._highlight_button, color=color)
+
+    def color_picker_selected_color(self, picker, color):
+        # The `ColorPicker` calls this method in the delegate once a color
+        # is selected from the `ColorPicker` Window.
+        if not self._root_widget:
+            return
+        tag = picker.get_tag()
+        if tag == "color":
+            self._set_color(color)
+        elif tag == "highlight":
+            self._set_highlight(color)
+        else:
+            raise ValueError("Unexpected color picker tag: {}".format(tag))
+
+    def color_picker_closing(self, picker):
+        # The `ColorPicker` expects this method to exist in the delegate,
+        # so here it is!
+        pass
+
+
+class CustomTransactions:
+    def __init__(self):
+        self.custom_transactions = {}
+
+    def _handle(self, transaction, *args, **kwargs):
+        transaction_code = transaction.get("code")
+        transaction_fn = self.custom_transactions.get(transaction_code)
+        if transaction_fn is not None:
+            return transaction_fn(transaction, *args, **kwargs)
+        return original_add_transaction(transaction, *args, **kwargs)
+
+    def add(self, transaction_code, transaction_fn):
+        self.custom_transactions[transaction_code] = transaction_fn
+
+    def enable(self):
+        bui.app.plus.add_v1_account_transaction = self._handle
+
+
+def launch_colorscheme_selection_window():
+    # We store whether the player is a pro account or not since we
+    # temporarily attempt to bypass the limitation where only pro
+    # accounts can set custom RGB color values, and we restore this
+    # value back later on.
+
+    # Also, we attempt to store this value here (and not in the
+    # beginning) since the player might be using other dedicated
+    # pro-unlocker plugins which may attempt to override the game
+    # method early on in the beginning, therefore, leading us to a
+    # race-condition and we may not correctly store whether the player
+    # has pro-unlocked or not if our plugin runs before the dedicated
+    # pro-unlocker plugin has been applied.
+    global original_have_pro
+    original_have_pro = bui.app.classic.accounts.have_pro
+
+    ColorSchemeWindow()
+
+
+def colorscheme_transaction(transaction, *args, **kwargs):
+    launch_colorscheme_selection_window()
+
+
+def load_colorscheme():
+    color, highlight = babase.app.config.get("ColorScheme", (None, None))
+    if color and highlight:
+        colorscheme = ColorScheme(color, highlight)
+        colorscheme.apply()
+
+
+def load_plugin():
+    # Allow access to changing colorschemes manually through the in-game
+    # console.
+    _babase.ColorScheme = ColorScheme
+    # Adds a new advanced code entry named "colorscheme" which can be
+    # entered through Settings -> Advanced -> Enter Code, allowing
+    # colorscheme modification through a friendly UI.
+    custom_transactions = CustomTransactions()
+    custom_transactions.add("colorscheme", colorscheme_transaction)
+    custom_transactions.enable()
+    # Load any previously saved colorscheme.
+    load_colorscheme()
+
+# بارگذاری پلاگین رنگ‌ها هنگام راه‌اندازی
+load_plugin()
+
+# فلگ متوقف کردن ارسال
+_stop_sending_icons = False
+_icon_timers = []  # لیست همه تایمرهای فعال
+_icons_menu_opened = False  # بررسی اینکه منو باز است یا نه
+
+def show_icons_menu(source_widget=None):
+    """نمایش منوی نمادها - ویندوز باریک و بلند با کنترل توقف"""
+    global _icons_menu_opened
+    if _icons_menu_opened:
+        return  # اگر منو باز است، دوباره ایجاد نشود
+    _icons_menu_opened = True
+
+    try:
+        icons = [
+            ('', ' نماد 1'),
+            ('', ' نماد 2'),
+            ('', ' نماد 3'),
+            ('', ' نماد 4'),
+            ('', ' نماد 5'),
+            ('', ' نماد 6'),
+            ('', ' نماد 7'),
+            ('', ' نماد 8'),
+            ('', ' نماد 9'),
+            ('', ' نماد 10'),
+            ('', ' نماد 11'),
+            ('', ' نماد 12'),
+            ('', ' نماد 13'),
+            ('', ' نماد 14'),
+            ('', ' نماد 15'),
+            ('', ' نماد 16'),
+            ('', ' نماد 17'),
+            ('', ' نماد 18'),
+            ('', ' نماد 19'),
+            ('', ' نماد 20'),
+            ('', ' نماد 21'),
+            ('', ' نماد 22'),
+            ('', ' نماد 23'),
+            ('', ' نماد 24'),
+            ('', ' نماد 25'),
+            ('', ' نماد 26'),
+            ('', ' نماد 27'),
+            ('', ' نماد 28'),
+            ('', ' نماد 29'),
+            ('', ' نماد 30'),
+            ('', ' نماد 31'),
+            ('', ' نماد 32'),
+            ('', ' نماد 33'),
+            ('', ' نماد 34'),
+            ('', ' نماد 35'),
+            ('', ' نماد 36')
+        ]
+
+        w = bui.containerwidget(
+            parent=bui.get_special_widget('overlay_stack'),
+            size=(800, 700),
+            scale=1.0,
+            transition='in_scale',
+            color=(0.12, 0.12, 0.12)
+        )
+
+        bui.textwidget(
+            parent=w,
+            text='نمادهای بازی',
+            position=(400, 660),
+            scale=1.3,
+            color=(1, 1, 0),
+            h_align='center'
+        )
+
+        scroll = bui.scrollwidget(
+            parent=w,
+            size=(700, 550),
+            position=(60, 90)
+        )
+
+        column = bui.columnwidget(parent=scroll, left_border=10)
+
+        for icon, label in icons:
+            bui.buttonwidget(
+                parent=column,
+                size=(650, 50),
+                label=label,
+                on_activate_call=lambda i=icon: send_icon(i),
+                color=(0.35, 0.35, 0.45),
+                textcolor=(1, 1, 1)
+            )
+
+        # دکمه ارسال همه
+        bui.buttonwidget(
+            parent=w,
+            position=(100, 30),
+            size=(200, 60),
+            label='ارسال همه (2ثانیه)',
+            on_activate_call=lambda: send_all_icons_delayed(icons, 2.0),
+            color=(0.2, 0.6, 0.2),
+            textcolor=(1, 1, 1)
+        )
+
+        # دکمه توقف ارسال
+        bui.buttonwidget(
+            parent=w,
+            position=(525, 30),
+            size=(180, 60),
+            label='⛔ توقف ارسال',
+            on_activate_call=stop_sending_icons,
+            color=(0.8, 0.3, 0.3),
+            textcolor=(1, 1, 1)
+        )
+
+        # دکمه بستن
+        bui.buttonwidget(
+            parent=w,
+            position=(350, 30),
+            size=(120, 60),
+            label='بستن',
+            on_activate_call=lambda: close_icons_menu(w),
+            color=(0.6, 0.2, 0.2),
+            textcolor=(1, 1, 1)
+        )
+
+    except Exception as e:
+        print(f"Error showing icons menu: {e}")
+
+def close_icons_menu(widget):
+    """بستن منوی نمادها"""
+    global _icons_menu_opened
+    _icons_menu_opened = False
+    bui.containerwidget(edit=widget, transition='out_scale')
+
+def send_icon(icon: str):
+    """ارسال نماد به چت"""
+    try:
+        bs.chatmessage(icon)
+        bui.screenmessage(f'ارسال شد: {icon}', color=(0, 1, 0))
+        bui.getsound('dingSmall').play()
+    except Exception as e:
+        print(f"Error sending icon: {e}")
+
+def send_all_icons_delayed(icons, delay_seconds=2.0):
+    """ارسال همه نمادها با تأخیر"""
+    global _stop_sending_icons, _icon_timers
+    _stop_sending_icons = False
+    _icon_timers = []
+
+    try:
+        bui.screenmessage(f'شروع ارسال همه نمادها (هر {delay_seconds} ثانیه)...', color=(0, 1, 1))
+        for i, (icon, _) in enumerate(icons):
+            t = bui.apptimer(i * delay_seconds, lambda ic=icon: send_single_icon_delayed(ic))
+            _icon_timers.append(t)
+    except Exception as e:
+        print(f"Error starting delayed send: {e}")
+
+def send_single_icon_delayed(icon: str):
+    """ارسال تک نماد با تأخیر"""
+    global _stop_sending_icons
+    try:
+        if _stop_sending_icons:
+            return
+        bs.chatmessage(icon)
+        bui.screenmessage(f'ارسال شد: {icon}', color=(0, 1, 0))
+    except Exception as e:
+        print(f"Error sending delayed icon: {e}")
+
+def stop_sending_icons():
+    """توقف کامل ارسال همه نمادها"""
+    global _stop_sending_icons, _icon_timers
+    _stop_sending_icons = True
+    # همه تایمرها رو لغو کنیم
+    for t in _icon_timers:
+        try:
+            t.cancel()
+        except Exception:
+            pass
+    _icon_timers = []
+    bui.screenmessage('⛔ ارسال همه نمادها متوقف شد', color=(1, 0, 0))
 
 # ba_meta require api 9
 # ba_meta export plugin
@@ -3020,10 +3794,31 @@ class byTaha(Plugin):
         def e(s,*a,**k):
             r = o(s,*a,**k)
             
-                        # دکمه اطلاعات بازیکنان - بالای فونت ساز
+            b_icons = AR.bw(
+                icon=gt('star'),  
+                position=(s._width+10, s._height-112), 
+                parent=s._root_widget,
+                iconscale=0.6,
+                size=(80, 25),
+                label='نمادها'
+            )
+            bw(b_icons, on_activate_call=Call(show_icons_menu, source_widget=b_icons))
+            
+            
+            # دکمه تغییر رنگ UI (همانند قبل)
+            b_uicolor = AR.bw(
+                icon=gt('egg2'),
+                position=(s._width+10, s._height-144),
+                parent=s._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='رنگ UI'
+            )
+            bw(b_uicolor, on_activate_call=Call(UIColorChanger, source=b_uicolor))
+                  # دکمه اطلاعات بازیکنان - زیر تغییر رنگ UI
             b_playerinfo = AR.bw(
                 icon=gt('ouyaOButton'),
-                position=(s._width+10, s._height-176),  # بالای فونت ساز
+                position=(s._width+10, s._height-176),  # زیر تغییر رنگ UI
                 parent=s._root_widget,
                 iconscale=0.6,
                 size=(80,25),
@@ -3044,7 +3839,7 @@ class byTaha(Plugin):
             
             # دکمه فونت‌ساز - بالای استیکر
             b_font = AR.bw(
-                icon=gt('star'),  # می‌تونی آیکون دلخواه بذاری
+                icon=gt('star'),
                 position=(s._width+10, s._height-208),  # 30px بالاتر از استیکر
                 parent=s._root_widget,
                 iconscale=0.6,
