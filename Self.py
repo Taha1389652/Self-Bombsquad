@@ -32,7 +32,7 @@ from bascenev1 import (
     get_connection_to_host_info_2 as get_connection_info,
     connect_to_party as original_connect,
     disconnect_from_host as original_disconnect,
-    get_foreground_host_activity  # این خط را اضافه کنید
+    get_foreground_host_activity
 )
 from _babase import get_string_width as strw
 from datetime import datetime as DT
@@ -55,6 +55,16 @@ import babase
 import bascenev1 as bs
 import bauiv1 as bui
 
+# --- Import های جدید برای Account Switcher ---
+from bauiv1lib.confirm import ConfirmWindow
+from bauiv1lib.account.settings import AccountSettingsWindow
+from os import listdir, path, mkdir, remove
+from shutil import copy, rmtree
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional
+    
 # لیست جوک‌های فارسی کوتاه و متنوع
 JOKES = [
     "پدر: درس خوندی؟ گفتم: خواب علمی بودم!",
@@ -489,6 +499,20 @@ current_ping = 0.0
 server_ip = "127.0.0.1"
 server_port = 43210
 server_name = "Local Server"
+
+# متغیرهای global برای Account Switcher
+UI_SCALE = 2.0 if (babase.app.ui_v1.uiscale == babase.UIScale.SMALL) else 1.0
+ACCOUNT_FILES = ['.bsac2', '.bsuuid', 'config.json', '.config_prev.json']
+plus = babase.app.plus
+env = babase.app.env
+USER_DIR = path.dirname(env.config_file_path)
+ACCOUNTS_DIR = path.join(USER_DIR, 'account_switcher_profiles')
+
+if not path.exists(ACCOUNTS_DIR):
+    mkdir(ACCOUNTS_DIR)
+
+if not path.exists(ACCOUNTS_DIR):
+    mkdir(ACCOUNTS_DIR)
 
 # تعریف متغیرهای global
 original_buttonwidget = bui.buttonwidget
@@ -1701,6 +1725,7 @@ class Help:
         
         cw(s.container, size=(360,600-y_pos))
         AR.swish()
+       
 
 """پایه پیام اتوماتیک"""
 class AR:
@@ -2537,6 +2562,20 @@ class ChatLog:
             # استفاده از پیام‌های فیلتر شده یا همه
             messages_to_show = s.filtered_messages
             
+            # اگر پیامی وجود ندارد
+            if not messages_to_show:
+                tw(
+                    parent=s.container,
+                    text='⚠️ هنوز چتی ارسال نشده',
+                    position=(190, 90),
+                    scale=0.8,
+                    color=(1, 0.5, 0),
+                    h_align='center'
+                )
+                tw(s.status_text, text='هیچ پیامی یافت نشد')
+                cw(s.container, size=(380, 200))
+                return
+            
             y_pos = len(messages_to_show) * 18 - 9  # فاصله خیلی کم
             for i, message in enumerate(messages_to_show):
                 # نمایش زمان اگر فعال باشد
@@ -2598,6 +2637,20 @@ class ChatLog:
                 if ':' in message:
                     username = message.split(':', 1)[0].strip()
                     user_stats[username] = user_stats.get(username, 0) + 1
+            
+            # اگر پیامی وجود ندارد
+            if not s.all_messages:
+                tw(
+                    parent=s.container,
+                    text='⚠️ هنوز چتی ارسال نشده',
+                    position=(190, 90),
+                    scale=0.8,
+                    color=(1, 0.5, 0),
+                    h_align='center'
+                )
+                tw(s.status_text, text='هیچ پیامی برای آمارگیری')
+                cw(s.container, size=(380, 200))
+                return
             
             # نمایش آمار فشرده
             stats = [
@@ -2676,6 +2729,16 @@ class FontMaker:
         # ویجت وضعیت هماهنگ
         s.status_text = tw(parent=w, text="آماده", 
                           position=(230, 25), scale=0.6, color=(0.8,0.8,1))
+
+        # نمایش پیام اولیه
+        tw(
+            parent=s.container,
+            text="⚠️ هنوز فونتی ساخته نشده",
+            position=(220, 70),
+            scale=0.7,
+            color=(1, 0.5, 0),
+            h_align='center'
+        )
 
         AR.swish()
 
@@ -2812,10 +2875,11 @@ class PlayerInfo:
             child.delete()
 
         if not s.players:
+            # نمایش پیام وقتی بازیکنی وجود ندارد
             tw(
                 parent=s.container,
-                text='⚠️ بازیکنی یافت نشد',
-                position=(280, 90),
+                text='⚠️ اطلاعاتی برای دریافت وجود ندارد',
+                position=(100, 90),
                 scale=0.8,
                 color=(1, 0.5, 0),
                 h_align='center'
@@ -3014,6 +3078,7 @@ class PlayerInfo:
                 
         except Exception:
             AR.err(f"❌ خطا در اخراج گروهی")
+            
             
 """تغییر رنگ UI"""
 class UIColorChanger:
@@ -3774,7 +3839,308 @@ def stop_sending_icons():
             pass
     _icon_timers = []
     bui.screenmessage('⛔ ارسال همه نمادها متوقف شد', color=(1, 0, 0))
+    
+class AccountSwitcherUI(bui.Window):
+    def __init__(self, source=None):
+        # ارتفاع کم با راهنما
+        self._width = 700
+        self._height = 250  # ارتفاع کم
 
+        self._root_widget = bui.containerwidget(
+            size=(self._width, self._height),
+            scale=UI_SCALE,
+            transition='in_right',
+            stack_offset=(0, 0),
+            color=(0.15, 0.15, 0.15)
+        )
+
+        # دکمه بستن
+        self._back_button = bui.buttonwidget(
+            parent=self._root_widget,
+            position=(20, self._height - 40),
+            size=(30, 30),
+            scale=0.8,
+            label=babase.charstr(babase.SpecialChar.BACK),
+            button_type='backSmall',
+            on_activate_call=self._close,
+        )
+        bui.containerwidget(edit=self._root_widget, cancel_button=self._back_button)
+
+        # عنوان
+        bui.textwidget(
+            parent=self._root_widget,
+            position=(self._width * 0.5, self._height - 25),
+            size=(0, 0),
+            h_align='center',
+            v_align='center',
+            text='🔀 تغییر اکانت',
+            scale=1.0,
+            color=(0, 1, 1),
+        )
+
+        # راهنما در بالای دکمه‌ها
+        bui.textwidget(
+            parent=self._root_widget,
+            position=(self._width * 0.5, 180),
+            size=(0, 0),
+            h_align='center',
+            v_align='center',
+            text='💡 راهنما: برای تغییر اکانت ابتدا ذخیره کنید',
+            scale=0.6,
+            color=(1, 1, 0.5),
+        )
+
+        # دکمه‌ها در یک ردیف
+        btn_width = 150
+        btn_height = 35
+        btn_spacing = 10
+        start_x = (self._width - (btn_width * 4 + btn_spacing * 3)) * 0.5
+        
+        bui.buttonwidget(
+            parent=self._root_widget,
+            position=(start_x, 130),
+            size=(btn_width, btn_height),
+            label='💾 ذخیره',
+            on_activate_call=self.save_current_account,
+            color=(0.3, 0.6, 0.3),
+            textcolor=(1, 1, 1),
+            text_scale=0.6
+        )
+        
+        bui.buttonwidget(
+            parent=self._root_widget,
+            position=(start_x + btn_width + btn_spacing, 130),
+            size=(btn_width, btn_height),
+            label='➕ جدید',
+            on_activate_call=self.add_new_account,
+            color=(0.3, 0.5, 0.7),
+            textcolor=(1, 1, 1),
+            text_scale=0.6
+        )
+        
+        bui.buttonwidget(
+            parent=self._root_widget,
+            position=(start_x + (btn_width + btn_spacing) * 2, 130),
+            size=(btn_width, btn_height),
+            label='↩️ بارگذاری',
+            on_activate_call=self.load_selected_account,
+            color=(0.5, 0.5, 0.3),
+            textcolor=(1, 1, 1),
+            text_scale=0.6
+        )
+        
+        bui.buttonwidget(
+            parent=self._root_widget,
+            position=(start_x + (btn_width + btn_spacing) * 3, 130),
+            size=(btn_width, btn_height),
+            label='🗑️ حذف',
+            on_activate_call=self.delete_selected_account,
+            color=(0.7, 0.3, 0.3),
+            textcolor=(1, 1, 1),
+            text_scale=0.6
+        )
+
+        # راهنمای دکمه‌ها در زیر آنها
+        guides = [
+            "اکانت فعلی را ذخیره می‌کند",
+            "اکانت جدید ایجاد می‌کند", 
+            "اکانت انتخاب شده را بارگذاری می‌کند",
+            "اکانت انتخاب شده را حذف می‌کند"
+        ]
+        
+        for i, guide in enumerate(guides):
+            bui.textwidget(
+                parent=self._root_widget,
+                position=(start_x + (btn_width + btn_spacing) * i + btn_width * 0.5, 110),
+                size=(0, 0),
+                h_align='center',
+                v_align='center',
+                text=guide,
+                scale=0.5,
+                color=(0.8, 0.8, 1),
+                maxwidth=btn_width
+            )
+
+        # لیست اکانت‌ها در پایین
+        self.list_width = self._width - 40
+        list_x = 20
+        
+        scroll = bui.scrollwidget(
+            parent=self._root_widget,
+            position=(list_x, 40),
+            size=(self.list_width, 60),
+        )
+
+        self._list = bui.columnwidget(
+            parent=scroll,
+            background=False,
+            border=0,
+        )
+
+        # راهنمای لیست
+        bui.textwidget(
+            parent=self._root_widget,
+            position=(self._width * 0.5, 30),
+            size=(0, 0),
+            h_align='center',
+            v_align='center',
+            text='📁 اکانت‌های ذخیره شده:',
+            scale=0.6,
+            color=(1, 1, 0.5),
+        )
+
+        self._selected_profile: Optional[str] = None
+        self._profile_widgets: list[bui.Widget] = []
+
+        self._refresh_account_list()
+
+    def _close(self) -> None:
+        bui.containerwidget(edit=self._root_widget, transition='out_right')
+
+    def _refresh_account_list(self):
+        for widget in self._profile_widgets:
+            widget.delete()
+        self._profile_widgets = []
+
+        profiles = []
+        if path.exists(ACCOUNTS_DIR):
+            profiles = sorted([p for p in listdir(ACCOUNTS_DIR) if path.isdir(path.join(ACCOUNTS_DIR, p))])
+        
+        if not profiles:
+            bui.textwidget(
+                parent=self._list,
+                position=(self.list_width * 0.5, 30),
+                size=(0, 0),
+                h_align='center',
+                v_align='center',
+                text='⚠️ هیچ اکانتی ذخیره نشده - ابتدا ذخیره کنید',
+                scale=0.6,
+                color=(1, 0.5, 0),
+            )
+            return
+        
+        # نمایش اکانت‌ها
+        for i, prof in enumerate(profiles[:4]):  # حداکثر 4 اکانت
+            btn = bui.buttonwidget(
+                parent=self._list,
+                label=prof[:12] + '...' if len(prof) > 12 else prof,
+                size=(self.list_width - 10, 25),
+                position=(5, 50 - i * 30),
+                on_activate_call=babase.Call(self.on_select_profile, prof),
+                color=(0.3, 0.4, 0.5),
+                textcolor=(1, 1, 1),
+                text_scale=0.5
+            )
+            self._profile_widgets.append(btn)
+
+    def on_select_profile(self, profile_name: str):
+        self._selected_profile = profile_name
+        for widget in self._profile_widgets:
+            bui.buttonwidget(edit=widget, color=(0.3, 0.4, 0.5))
+        bui.screenmessage(f"انتخاب شد: {profile_name}", color=(0, 1, 0))
+
+    # بقیه متدها...
+    def get_current_account(self) -> Optional[str]:
+        if plus.get_v1_account_state() == 'signed_in':
+            return plus.get_v1_account_display_string()
+        return None
+
+    def save_current_account(self):
+        name = self.get_current_account()
+        if not name:
+            bui.screenmessage("⚠️ هیچ اکانتی وارد نشده!", color=(1, 0, 0))
+            return
+
+        account_folder = path.join(ACCOUNTS_DIR, name)
+        if not path.exists(account_folder):
+            mkdir(account_folder)
+
+        success_count = 0
+        for fname in ACCOUNT_FILES:
+            src = path.join(USER_DIR, fname)
+            if path.exists(src):
+                try:
+                    copy(src, path.join(account_folder, fname))
+                    success_count += 1
+                except IOError as e:
+                    bui.screenmessage(f"خطا در ذخیره {fname}: {e}", color=(1, 0, 0))
+
+        if success_count > 0:
+            bui.screenmessage(f"✅ '{name}' ذخیره شد", color=(0, 1, 0))
+            self._refresh_account_list()
+        else:
+            bui.screenmessage("❌ ذخیره نشد!", color=(1, 0, 0))
+
+    def add_new_account(self) -> None:
+        def do_action():
+            self.save_current_account()
+            for fname in ACCOUNT_FILES:
+                file_path = path.join(USER_DIR, fname)
+                if path.exists(file_path):
+                    remove(file_path)
+            bui.screenmessage('حذف شد. بازی بسته می‌شود...', color=(1, 0.5, 0))
+
+        ConfirmWindow(
+            text='اکانت فعلی ذخیره و بازی بسته می‌شود؟',
+            action=lambda: self.lock_call_exit(do_action),
+            ok_text='تأیید',
+            cancel_text='انصراف',
+        )
+
+    def lock_call_exit(self, callable_action):
+        babase.suppress_config_and_state_writes()
+        callable_action()
+        babase.apptimer(1.0, babase.quit)
+
+    def load_selected_account(self):
+        if not self._selected_profile:
+            bui.screenmessage("⚠️ یک اکانت انتخاب کنید!", color=(1, 0, 0))
+            return
+
+        ConfirmWindow(
+            text=f"بارگذاری '{self._selected_profile}'؟ بازی بسته می‌شود",
+            action=lambda: self.lock_call_exit(lambda: None),
+            ok_text='تأیید',
+            cancel_text='انصراف',
+        )
+
+    def delete_selected_account(self):
+        if not self._selected_profile:
+            bui.screenmessage("⚠️ یک اکانت انتخاب کنید!", color=(1, 0, 0))
+            return
+
+        def do_delete():
+            account_folder = path.join(ACCOUNTS_DIR, self._selected_profile)
+            if path.exists(account_folder):
+                rmtree(account_folder)
+                bui.screenmessage(f"✅ '{self._selected_profile}' حذف شد", color=(1, 0.5, 0))
+                self._selected_profile = None
+                self._refresh_account_list()
+
+        ConfirmWindow(
+            text=f"حذف دائمی '{self._selected_profile}'؟",
+            action=do_delete,
+            ok_text='حذف',
+            cancel_text='انصراف',
+        )
+
+# Monkey-patching برای Account Settings - این را در بالای فایل (قبل از کلاس byTaha) قرار دهید
+_original_account_settings_init = AccountSettingsWindow.__init__
+
+def new_account_settings_init(self, *args, **kwargs):
+    _original_account_settings_init(self, *args, **kwargs)
+    
+    button_width = 350
+    bui.buttonwidget(
+        parent=self._subcontainer,
+        position=((self._sub_width - button_width) * 0.5, -25),
+        size=(button_width, 60),
+        label='Switch Accounts...',
+        on_activate_call=lambda: AccountSwitcherUI(),
+        color=(0.4, 0.5, 0.6),
+        textcolor=(1, 1, 1)
+    )
+    
 # ba_meta require api 9
 # ba_meta export plugin
 class byTaha(Plugin):
@@ -3786,149 +4152,166 @@ class byTaha(Plugin):
         # اورراید کردن توابع اتصال
         setup_connection_overrides()
         
+        # اعمال monkey-patching برای Account Switcher
+        AccountSettingsWindow.__init__ = new_account_settings_init
+        
         # اضافه کردن متغیر آنتی اسپم
         s.last_command_time = {}
-        s.cooldown_time = 1.5  # 4 ثانیه تأخیر بین دستورات
+        s.cooldown_time = 1.5
         
         o = party.PartyWindow.__init__
-        def e(s,*a,**k):
-            r = o(s,*a,**k)
+        def e(self,*a,**k):
+            r = o(self,*a,**k)
             
-            b_icons = AR.bw(
-                icon=gt('star'),  
-                position=(s._width+10, s._height-112), 
-                parent=s._root_widget,
+            # دکمه Account Switcher با آیکون
+            b_account = AR.bw(
+                icon=gt('ouyaUButton'),
+                position=(self._width+10, self._height-80),
+                parent=self._root_widget,
                 iconscale=0.6,
-                size=(80, 25),
+                size=(80,25),
+                label='اکانت‌ها'
+            )
+            bw(b_account, on_activate_call=Call(AccountSwitcherUI, source=b_account))
+            
+            # دکمه نمادها با آیکون
+            b_icons = AR.bw(
+                icon=gt('egg3'),  
+                position=(self._width+10, self._height-112), 
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
                 label='نمادها'
             )
             bw(b_icons, on_activate_call=Call(show_icons_menu, source_widget=b_icons))
             
-            
-            # دکمه تغییر رنگ UI (همانند قبل)
+            # دکمه تغییر رنگ UI با آیکون
             b_uicolor = AR.bw(
                 icon=gt('egg2'),
-                position=(s._width+10, s._height-144),
-                parent=s._root_widget,
+                position=(self._width+10, self._height-144),
+                parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
                 label='رنگ UI'
             )
             bw(b_uicolor, on_activate_call=Call(UIColorChanger, source=b_uicolor))
-                  # دکمه اطلاعات بازیکنان - زیر تغییر رنگ UI
+            
+            # دکمه اطلاعات بازیکنان با آیکون
             b_playerinfo = AR.bw(
                 icon=gt('ouyaOButton'),
-                position=(s._width+10, s._height-176),  # زیر تغییر رنگ UI
-                parent=s._root_widget,
+                position=(self._width+10, self._height-176),
+                parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
                 label='بازیکنان'
             )
             bw(b_playerinfo, on_activate_call=Call(PlayerInfo, source=b_playerinfo))
             
-            # دکمه چت لاگ - بالای استیکر
+            # دکمه چت لاگ با آیکون
             b_chatlog = AR.bw(
                 icon=gt('logo'),
-                position=(s._width+10,s._height-240),  # بالای استیکر
-                parent=s._root_widget,
+                position=(self._width+10, self._height-240),
+                parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
                 label='چت لاگ'
             )
-            bw(b_chatlog,on_activate_call=Call(ChatLog,source=b_chatlog))
+            bw(b_chatlog, on_activate_call=Call(ChatLog, source=b_chatlog))
             
-            # دکمه فونت‌ساز - بالای استیکر
+            # دکمه فونت‌ساز با آیکون
             b_font = AR.bw(
                 icon=gt('star'),
-                position=(s._width+10, s._height-208),  # 30px بالاتر از استیکر
-                parent=s._root_widget,
+                position=(self._width+10, self._height-208),
+                parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
                 label='فونت‌ساز'
             )
             bw(b_font, on_activate_call=Call(FontMaker, source=b_font))
             
-            # دکمه استیکر - زیر چت لاگ
+            # دکمه استیکر با آیکون
             b_sticker = AR.bw(
                 icon=gt('heart'),
-                position=(s._width+10,s._height-272),  # زیر چت لاگ
-                parent=s._root_widget,
+                position=(self._width+10, self._height-272),
+                parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
                 label='استیکر'
             )
-            bw(b_sticker,on_activate_call=Call(StickerMenu,source=b_sticker))
+            bw(b_sticker, on_activate_call=Call(StickerMenu, source=b_sticker))
             
-            # دکمه اصلی پیام اتوماتیک
+            # دکمه اصلی پیام اتوماتیک با آیکون
             b_main = AR.bw(
                 icon=gt('achievementOutline'),
-                position=(s._width+10,s._height-45),
-                parent=s._root_widget,
-                iconscale=0.7,
-                size=(90,30),
+                position=(self._width+10, self._height-45),
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
                 label='پیام اتوماتیک'
             )
-            bw(b_main,on_activate_call=Call(AR,source=b_main))
+            bw(b_main, on_activate_call=Call(AR, source=b_main))
             
             return r
+        
         party.PartyWindow.__init__ = e
         s.z = []
-        teck(5,s.ear)
+        teck(5, s.ear)
     
     def __del__(s):
-        # توقف thread پینگ هنگام حذف پلاگین
         if ping_thread:
             ping_thread.stop()
     
     def ear(s):
-        z = GCM()
-        teck(0.3,s.ear)
-        if z == s.z: return
-        
-        # بررسی وضعیت خاموش/روشن
-        if not var('state'):  # اگر حالت خاموش است
-            s.z = z  # به روز رسانی ولی هیچ پاسخی نده
-            return
-        
-        s.z = z;
-        v = z[-1]
-        if v.endswith(s.B): return
-        
-        # بررسی فرمت پیام
-        if ': ' not in v:
-            return
+        try:
+            z = GCM()
+            teck(0.3, s.ear)
+            if z == s.z: return
             
-        f,m = v.split(': ',1)
-        k = s.me()
-        if f in [k,s.v2+k] and not var('tune2'): return
-        
-        # سیستم آنتی اسپم - بررسی تأخیر 4 ثانیه
-        current_time = time.time()
-        if f in s.last_command_time:
-            time_since_last = current_time - s.last_command_time[f]
-            if time_since_last < s.cooldown_time:
-                return  # هنوز تأخیر تمام نشده
-        
-        if var('tune3'): 
-            l = var('l')
-        else: 
-            m = m.lower()
-            l = var('lc')
+            if not var('state'):
+                s.z = z
+                return
             
-        h = l.get(m,None)
-        if h is not None: # equal
-            a,b,_ = h
-            s.S(b,a,f,0)
-            s.last_command_time[f] = current_time  # ثبت زمان آخرین دستور
-        else: # wild
-            re = [y for y,_ in sorted([(y,m.find(y)) for y in l if y in m],key=lambda x: x[1])]
-            for r in re:
-                a,b,c = l.get(r,[0,0,0])
-                if not r or not c: continue # unwild :c
-                s.S(b,a,f,1)
-                s.last_command_time[f] = current_time  # ثبت زمان آخرین دستور
-                break  # فقط به یک دستور پاسخ بده
-    
+            s.z = z
+            if not z: return
+            
+            v = z[-1]
+            if v.endswith(s.B): return
+            
+            if ': ' not in v:
+                return
+                
+            f, m = v.split(': ', 1)
+            k = s.me()
+            if f in [k, s.v2+k] and not var('tune2'): return
+            
+            current_time = time.time()
+            if f in s.last_command_time:
+                time_since_last = current_time - s.last_command_time[f]
+                if time_since_last < s.cooldown_time:
+                    return
+            
+            if var('tune3'): 
+                l = var('l')
+            else: 
+                m = m.lower()
+                l = var('lc')
+                
+            h = l.get(m, None)
+            if h is not None:
+                a, b, _ = h
+                s.S(b, a, f, 0)
+                s.last_command_time[f] = current_time
+            else:
+                re = [y for y, _ in sorted([(y, m.find(y)) for y in l if y in m], key=lambda x: x[1])]
+                for r in re:
+                    a, b, c = l.get(r, [0, 0, 0])
+                    if not r or not c: continue
+                    s.S(b, a, f, 1)
+                    s.last_command_time[f] = current_time
+                    break
+        except Exception as e:
+            print(f"Error in ear: {e}")
+
     def S(s,b,a,f,j):
         p = AR.parse(t=a,s=f)
         teck(b,Call(CM,p+s.B))
