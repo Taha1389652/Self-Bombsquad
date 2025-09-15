@@ -3840,307 +3840,431 @@ def stop_sending_icons():
     _icon_timers = []
     bui.screenmessage('⛔ ارسال همه نمادها متوقف شد', color=(1, 0, 0))
     
-class AccountSwitcherUI(bui.Window):
-    def __init__(self, source=None):
-        # ارتفاع کم با راهنما
-        self._width = 700
-        self._height = 250  # ارتفاع کم
-
-        self._root_widget = bui.containerwidget(
-            size=(self._width, self._height),
-            scale=UI_SCALE,
-            transition='in_right',
-            stack_offset=(0, 0),
-            color=(0.15, 0.15, 0.15)
+# اضافه کردن کلاس ماشین حساب بعد از کلاس PlayerInfo
+# اضافه کردن کلاس ماشین حساب بعد از کلاس PlayerInfo
+class Calculator:
+    def __init__(s, source):
+        # ویندوز با ارتفاع 330 (کاهش یافته)
+        w = s.w = AR.cw(
+            source=source,
+            size=(400, 330),  # ارتفاع 330
+            ps=AR.UIS()*0.7
         )
-
-        # دکمه بستن
-        self._back_button = bui.buttonwidget(
-            parent=self._root_widget,
-            position=(20, self._height - 40),
-            size=(30, 30),
-            scale=0.8,
-            label=babase.charstr(babase.SpecialChar.BACK),
-            button_type='backSmall',
-            on_activate_call=self._close,
-        )
-        bui.containerwidget(edit=self._root_widget, cancel_button=self._back_button)
-
+        # افزودن دکمه بستن
+        AR.add_close_button(w, position=(370, 290))
+        
         # عنوان
-        bui.textwidget(
-            parent=self._root_widget,
-            position=(self._width * 0.5, self._height - 25),
-            size=(0, 0),
-            h_align='center',
-            v_align='center',
-            text='🔀 تغییر اکانت',
+        tw(
+            parent=w,
+            text='🧮 ماشین حساب',
             scale=1.0,
-            color=(0, 1, 1),
-        )
-
-        # راهنما در بالای دکمه‌ها
-        bui.textwidget(
-            parent=self._root_widget,
-            position=(self._width * 0.5, 180),
-            size=(0, 0),
+            position=(180, 295),
             h_align='center',
-            v_align='center',
-            text='💡 راهنما: برای تغییر اکانت ابتدا ذخیره کنید',
-            scale=0.6,
-            color=(1, 1, 0.5),
-        )
-
-        # دکمه‌ها در یک ردیف
-        btn_width = 150
-        btn_height = 35
-        btn_spacing = 10
-        start_x = (self._width - (btn_width * 4 + btn_spacing * 3)) * 0.5
-        
-        bui.buttonwidget(
-            parent=self._root_widget,
-            position=(start_x, 130),
-            size=(btn_width, btn_height),
-            label='💾 ذخیره',
-            on_activate_call=self.save_current_account,
-            color=(0.3, 0.6, 0.3),
-            textcolor=(1, 1, 1),
-            text_scale=0.6
+            color=(0, 1, 1)
         )
         
-        bui.buttonwidget(
-            parent=self._root_widget,
-            position=(start_x + btn_width + btn_spacing, 130),
-            size=(btn_width, btn_height),
-            label='➕ جدید',
-            on_activate_call=self.add_new_account,
-            color=(0.3, 0.5, 0.7),
-            textcolor=(1, 1, 1),
-            text_scale=0.6
+        # نمایشگر نتیجه
+        s.display = tw(
+            parent=w,
+            text='0',
+            position=(175, 260),
+            scale=1.2,
+            h_align='center',
+            color=(1, 1, 1),
+            maxwidth=350
         )
         
-        bui.buttonwidget(
-            parent=self._root_widget,
-            position=(start_x + (btn_width + btn_spacing) * 2, 130),
-            size=(btn_width, btn_height),
-            label='↩️ بارگذاری',
-            on_activate_call=self.load_selected_account,
-            color=(0.5, 0.5, 0.3),
-            textcolor=(1, 1, 1),
-            text_scale=0.6
-        )
+        # متغیرهای محاسبات
+        s.current_input = '0'
+        s.previous_input = ''
+        s.operation = None
+        s.reset_next_input = False
+        s.display_formatted = True  # حالت نمایش با ویرگول
         
-        bui.buttonwidget(
-            parent=self._root_widget,
-            position=(start_x + (btn_width + btn_spacing) * 3, 130),
-            size=(btn_width, btn_height),
-            label='🗑️ حذف',
-            on_activate_call=self.delete_selected_account,
-            color=(0.7, 0.3, 0.3),
-            textcolor=(1, 1, 1),
-            text_scale=0.6
-        )
-
-        # راهنمای دکمه‌ها در زیر آنها
-        guides = [
-            "اکانت فعلی را ذخیره می‌کند",
-            "اکانت جدید ایجاد می‌کند", 
-            "اکانت انتخاب شده را بارگذاری می‌کند",
-            "اکانت انتخاب شده را حذف می‌کند"
+        # دکمه‌های مدیریت جدید (کپی و ارسال)
+        action_buttons = [
+            ('📋 کپی', s.copy_result, (20, 230), (170, 30), (0.3, 0.6, 0.8)),
+            ('💬 ارسال', s.send_to_chat, (210, 230), (170, 30), (0.3, 0.8, 0.6))
         ]
         
-        for i, guide in enumerate(guides):
-            bui.textwidget(
-                parent=self._root_widget,
-                position=(start_x + (btn_width + btn_spacing) * i + btn_width * 0.5, 110),
-                size=(0, 0),
-                h_align='center',
-                v_align='center',
-                text=guide,
-                scale=0.5,
-                color=(0.8, 0.8, 1),
-                maxwidth=btn_width
-            )
-
-        # لیست اکانت‌ها در پایین
-        self.list_width = self._width - 40
-        list_x = 20
-        
-        scroll = bui.scrollwidget(
-            parent=self._root_widget,
-            position=(list_x, 40),
-            size=(self.list_width, 60),
-        )
-
-        self._list = bui.columnwidget(
-            parent=scroll,
-            background=False,
-            border=0,
-        )
-
-        # راهنمای لیست
-        bui.textwidget(
-            parent=self._root_widget,
-            position=(self._width * 0.5, 30),
-            size=(0, 0),
-            h_align='center',
-            v_align='center',
-            text='📁 اکانت‌های ذخیره شده:',
-            scale=0.6,
-            color=(1, 1, 0.5),
-        )
-
-        self._selected_profile: Optional[str] = None
-        self._profile_widgets: list[bui.Widget] = []
-
-        self._refresh_account_list()
-
-    def _close(self) -> None:
-        bui.containerwidget(edit=self._root_widget, transition='out_right')
-
-    def _refresh_account_list(self):
-        for widget in self._profile_widgets:
-            widget.delete()
-        self._profile_widgets = []
-
-        profiles = []
-        if path.exists(ACCOUNTS_DIR):
-            profiles = sorted([p for p in listdir(ACCOUNTS_DIR) if path.isdir(path.join(ACCOUNTS_DIR, p))])
-        
-        if not profiles:
-            bui.textwidget(
-                parent=self._list,
-                position=(self.list_width * 0.5, 30),
-                size=(0, 0),
-                h_align='center',
-                v_align='center',
-                text='⚠️ هیچ اکانتی ذخیره نشده - ابتدا ذخیره کنید',
-                scale=0.6,
-                color=(1, 0.5, 0),
-            )
-            return
-        
-        # نمایش اکانت‌ها
-        for i, prof in enumerate(profiles[:4]):  # حداکثر 4 اکانت
-            btn = bui.buttonwidget(
-                parent=self._list,
-                label=prof[:12] + '...' if len(prof) > 12 else prof,
-                size=(self.list_width - 10, 25),
-                position=(5, 50 - i * 30),
-                on_activate_call=babase.Call(self.on_select_profile, prof),
-                color=(0.3, 0.4, 0.5),
+        for label, callback, pos, size, color in action_buttons:
+            bw(
+                parent=w,
+                label=label,
+                size=size,
+                position=pos,
+                on_activate_call=callback,
+                color=color,
                 textcolor=(1, 1, 1),
-                text_scale=0.5
+                text_scale=0.7
             )
-            self._profile_widgets.append(btn)
-
-    def on_select_profile(self, profile_name: str):
-        self._selected_profile = profile_name
-        for widget in self._profile_widgets:
-            bui.buttonwidget(edit=widget, color=(0.3, 0.4, 0.5))
-        bui.screenmessage(f"انتخاب شد: {profile_name}", color=(0, 1, 0))
-
-    # بقیه متدها...
-    def get_current_account(self) -> Optional[str]:
-        if plus.get_v1_account_state() == 'signed_in':
-            return plus.get_v1_account_display_string()
-        return None
-
-    def save_current_account(self):
-        name = self.get_current_account()
-        if not name:
-            bui.screenmessage("⚠️ هیچ اکانتی وارد نشده!", color=(1, 0, 0))
-            return
-
-        account_folder = path.join(ACCOUNTS_DIR, name)
-        if not path.exists(account_folder):
-            mkdir(account_folder)
-
-        success_count = 0
-        for fname in ACCOUNT_FILES:
-            src = path.join(USER_DIR, fname)
-            if path.exists(src):
-                try:
-                    copy(src, path.join(account_folder, fname))
-                    success_count += 1
-                except IOError as e:
-                    bui.screenmessage(f"خطا در ذخیره {fname}: {e}", color=(1, 0, 0))
-
-        if success_count > 0:
-            bui.screenmessage(f"✅ '{name}' ذخیره شد", color=(0, 1, 0))
-            self._refresh_account_list()
+        
+        # دکمه‌های اصلی ماشین حساب
+        buttons = [
+            # ردیف 1
+            ('C', s.clear_all, (20, 180), (55, 30), (1, 0.5, 0.5)),
+            ('±', s.toggle_sign, (85, 180), (55, 30), (0.5, 0.7, 1)),
+            ('%', s.percentage, (150, 180), (55, 30), (0.5, 0.7, 1)),
+            ('x²', s.square, (215, 180), (55, 30), (0.5, 0.7, 1)),
+            ('√', s.square_root, (280, 180), (55, 30), (0.5, 0.7, 1)),
+            ('xʸ', s.power, (345, 180), (55, 30), (0.5, 0.7, 1)),
+            
+            # ردیف 2
+            ('7', lambda: s.append_number('7'), (20, 140), (55, 30), (0.4, 0.4, 0.6)),
+            ('8', lambda: s.append_number('8'), (85, 140), (55, 30), (0.4, 0.4, 0.6)),
+            ('9', lambda: s.append_number('9'), (150, 140), (55, 30), (0.4, 0.4, 0.6)),
+            ('÷', lambda: s.set_operation('/'), (215, 140), (55, 30), (1, 0.8, 0.3)),
+            ('⌫', s.backspace, (280, 140), (55, 30), (0.8, 0.3, 0.3)),
+            (',', s.toggle_format, (345, 140), (55, 30), (0.7, 0.5, 0.8)),
+            
+            # ردیف 3
+            ('4', lambda: s.append_number('4'), (20, 100), (55, 30), (0.4, 0.4, 0.6)),
+            ('5', lambda: s.append_number('5'), (85, 100), (55, 30), (0.4, 0.4, 0.6)),
+            ('6', lambda: s.append_number('6'), (150, 100), (55, 30), (0.4, 0.4, 0.6)),
+            ('×', lambda: s.set_operation('*'), (215, 100), (55, 30), (1, 0.8, 0.3)),
+            ('1/x', s.reciprocal, (280, 100), (55, 30), (0.5, 0.7, 1)),
+            ('±', s.toggle_format_display, (345, 100), (55, 30), (0.7, 0.5, 0.8)),
+            
+            # ردیف 4
+            ('1', lambda: s.append_number('1'), (20, 60), (55, 30), (0.4, 0.4, 0.6)),
+            ('2', lambda: s.append_number('2'), (85, 60), (55, 30), (0.4, 0.4, 0.6)),
+            ('3', lambda: s.append_number('3'), (150, 60), (55, 30), (0.4, 0.4, 0.6)),
+            ('-', lambda: s.set_operation('-'), (215, 60), (55, 30), (1, 0.8, 0.3)),
+            ('n!', s.factorial, (280, 60), (55, 30), (0.5, 0.7, 1)),
+            ('log', s.logarithm, (345, 60), (55, 30), (0.5, 0.7, 1)),
+            
+            # ردیف 5
+            ('0', lambda: s.append_number('0'), (20, 20), (120, 30), (0.4, 0.4, 0.6)),
+            ('.', s.add_decimal, (150, 20), (55, 30), (0.4, 0.4, 0.6)),
+            ('=', s.calculate, (215, 20), (55, 30), (0.2, 0.8, 0.2)),
+            ('+', lambda: s.set_operation('+'), (280, 20), (120, 30), (1, 0.8, 0.3)),
+        ]
+        
+        for label, callback, pos, size, color in buttons:
+            bw(
+                parent=w,
+                label=label,
+                size=size,
+                position=pos,
+                on_activate_call=callback,
+                color=color,
+                textcolor=(1, 1, 1),
+                text_scale=0.8
+            )
+        
+        AR.swish()
+    
+    def format_number(s, number_str):
+        try:
+            # تبدیل به عدد
+            num = float(number_str)
+            
+            # اگر عدد صحیح است
+            if num.is_integer():
+                num_int = int(num)
+                # فرمت با ویرگول برای اعداد بزرگ
+                if abs(num_int) >= 1000:
+                    return f"{num_int:,}"
+                else:
+                    return str(num_int)
+            
+            # اگر عدد اعشاری است
+            else:
+                # بررسی اگر اعشار صفر است (مثل 5.0)
+                if num == int(num):
+                    num_int = int(num)
+                    if abs(num_int) >= 1000:
+                        return f"{num_int:,}"
+                    else:
+                        return str(num_int)
+                
+                # برای اعداد اعشاری واقعی
+                parts = str(num).split('.')
+                int_part = int(parts[0]) if parts[0] else 0
+                
+                # فرمت قسمت صحیح با ویرگول
+                formatted_int = f"{int_part:,}"
+                
+                # اضافه کردن قسمت اعشاری (حداکثر 6 رقم)
+                decimal_part = parts[1][:6].rstrip('0')
+                if decimal_part:
+                    return formatted_int + '.' + decimal_part
+                else:
+                    return formatted_int
+                    
+        except:
+            return number_str
+    
+    def parse_number(s, formatted_str):
+        # حذف ویرگول‌ها برای محاسبات
+        return formatted_str.replace(',', '')
+    
+    def get_display_text(s):
+        """متن نمایش داده شده را برمی‌گرداند (با ویرگول)"""
+        if s.display_formatted:
+            return s.format_number(s.current_input)
         else:
-            bui.screenmessage("❌ ذخیره نشد!", color=(1, 0, 0))
-
-    def add_new_account(self) -> None:
-        def do_action():
-            self.save_current_account()
-            for fname in ACCOUNT_FILES:
-                file_path = path.join(USER_DIR, fname)
-                if path.exists(file_path):
-                    remove(file_path)
-            bui.screenmessage('حذف شد. بازی بسته می‌شود...', color=(1, 0.5, 0))
-
-        ConfirmWindow(
-            text='اکانت فعلی ذخیره و بازی بسته می‌شود؟',
-            action=lambda: self.lock_call_exit(do_action),
-            ok_text='تأیید',
-            cancel_text='انصراف',
-        )
-
-    def lock_call_exit(self, callable_action):
-        babase.suppress_config_and_state_writes()
-        callable_action()
-        babase.apptimer(1.0, babase.quit)
-
-    def load_selected_account(self):
-        if not self._selected_profile:
-            bui.screenmessage("⚠️ یک اکانت انتخاب کنید!", color=(1, 0, 0))
-            return
-
-        ConfirmWindow(
-            text=f"بارگذاری '{self._selected_profile}'؟ بازی بسته می‌شود",
-            action=lambda: self.lock_call_exit(lambda: None),
-            ok_text='تأیید',
-            cancel_text='انصراف',
-        )
-
-    def delete_selected_account(self):
-        if not self._selected_profile:
-            bui.screenmessage("⚠️ یک اکانت انتخاب کنید!", color=(1, 0, 0))
-            return
-
-        def do_delete():
-            account_folder = path.join(ACCOUNTS_DIR, self._selected_profile)
-            if path.exists(account_folder):
-                rmtree(account_folder)
-                bui.screenmessage(f"✅ '{self._selected_profile}' حذف شد", color=(1, 0.5, 0))
-                self._selected_profile = None
-                self._refresh_account_list()
-
-        ConfirmWindow(
-            text=f"حذف دائمی '{self._selected_profile}'؟",
-            action=do_delete,
-            ok_text='حذف',
-            cancel_text='انصراف',
-        )
-
-# Monkey-patching برای Account Settings - این را در بالای فایل (قبل از کلاس byTaha) قرار دهید
-_original_account_settings_init = AccountSettingsWindow.__init__
-
-def new_account_settings_init(self, *args, **kwargs):
-    _original_account_settings_init(self, *args, **kwargs)
+            return s.current_input
     
-    button_width = 350
-    bui.buttonwidget(
-        parent=self._subcontainer,
-        position=((self._sub_width - button_width) * 0.5, -25),
-        size=(button_width, 60),
-        label='Switch Accounts...',
-        on_activate_call=lambda: AccountSwitcherUI(),
-        color=(0.4, 0.5, 0.6),
-        textcolor=(1, 1, 1)
-    )
+    def get_raw_text(s):
+        """متن خام را برمی‌گرداند (بدون ویرگول برای محاسبات)"""
+        return s.parse_number(s.current_input) if s.display_formatted else s.current_input
     
+    def update_display(s):
+        if s.display.exists():
+            display_text = s.get_display_text()
+            tw(s.display, text=display_text)
+    
+    def toggle_format(s):
+        s.display_formatted = not s.display_formatted
+        s.update_display()
+        gs('click01').play()
+    
+    def toggle_format_display(s):
+        status = "با ویرگول" if s.display_formatted else "بدون ویرگول"
+        push(f"حالت نمایش: {status}", color=(0, 1, 1))
+        gs('dingSmall').play()
+    
+    def append_number(s, number):
+        if s.reset_next_input:
+            s.current_input = '0'
+            s.reset_next_input = False
+        current = s.get_raw_text()
+        if current == '0':
+            current = number
+        else:
+            current += number
+        s.current_input = current
+        s.update_display()
+        gs('click01').play()
+    
+    def add_decimal(s):
+        if s.reset_next_input:
+            s.current_input = '0'
+            s.reset_next_input = False
+        current = s.get_raw_text()
+        if '.' not in current:
+            current += '.'
+            s.current_input = current
+            s.update_display()
+            gs('click01').play()
+    
+    def backspace(s):
+        current = s.get_raw_text()
+        if current != '0' and len(current) > 1:
+            current = current[:-1]
+        elif len(current) == 1:
+            current = '0'
+        s.current_input = current
+        s.update_display()
+        gs('swish').play()
+    
+    def square(s):
+        try:
+            current = s.get_raw_text()
+            value = float(current)
+            result = value ** 2
+            s.current_input = str(result)
+            s.update_display()
+            gs('dingSmall').play()
+        except:
+            s.current_input = 'خطا'
+            s.update_display()
+            gs('error').play()
+            teck(2.0, s.clear_all)
+    
+    def square_root(s):
+        try:
+            current = s.get_raw_text()
+            value = float(current)
+            if value < 0:
+                raise ValueError("جذر اعداد منفی")
+            result = value ** 0.5
+            s.current_input = str(result)
+            s.update_display()
+            gs('dingSmall').play()
+        except:
+            s.current_input = 'خطا'
+            s.update_display()
+            gs('error').play()
+            teck(2.0, s.clear_all)
+    
+    def power(s):
+        try:
+            if s.operation and not s.reset_next_input:
+                s.calculate()
+            current = s.get_raw_text()
+            s.previous_input = current
+            s.operation = '**'
+            s.reset_next_input = True
+            push("عدد دوم را وارد کنید", color=(0, 1, 1))
+            gs('click01').play()
+        except:
+            s.clear_all()
+    
+    def reciprocal(s):
+        try:
+            current = s.get_raw_text()
+            value = float(current)
+            if value == 0:
+                raise ZeroDivisionError
+            result = 1 / value
+            s.current_input = str(result)
+            s.update_display()
+            gs('dingSmall').play()
+        except:
+            s.current_input = 'خطا'
+            s.update_display()
+            gs('error').play()
+            teck(2.0, s.clear_all)
+    
+    def factorial(s):
+        try:
+            current = s.get_raw_text()
+            n = int(float(current))
+            if n < 0:
+                raise ValueError("فاکتوریل منفی تعریف نشده")
+            import math
+            result = math.factorial(n)
+            s.current_input = str(result)
+            s.update_display()
+            gs('dingSmall').play()
+        except:
+            s.current_input = 'خطا'
+            s.update_display()
+            gs('error').play()
+            teck(2.0, s.clear_all)
+
+    def logarithm(s):
+        try:
+            current = s.get_raw_text()
+            value = float(current)
+            if value <= 0:
+                raise ValueError("لگاریتم تعریف نشده")
+            import math
+            result = math.log10(value)
+            s.current_input = str(result)
+            s.update_display()
+            gs('dingSmall').play()
+        except:
+            s.current_input = 'خطا'
+            s.update_display()
+            gs('error').play()
+            teck(2.0, s.clear_all)
+    
+    def toggle_sign(s):
+        current = s.get_raw_text()
+        if current != '0':
+            if current.startswith('-'):
+                current = current[1:]
+            else:
+                current = '-' + current
+            s.current_input = current
+            s.update_display()
+            gs('click01').play()
+    
+    def percentage(s):
+        try:
+            current = s.get_raw_text()
+            value = float(current) / 100
+            s.current_input = str(value)
+            s.update_display()
+            gs('dingSmall').play()
+        except:
+            s.current_input = '0'
+            s.update_display()
+    
+    def set_operation(s, op):
+        try:
+            if s.operation and not s.reset_next_input:
+                s.calculate()
+            current = s.get_raw_text()
+            s.previous_input = current
+            s.operation = op
+            s.reset_next_input = True
+            gs('click01').play()
+        except:
+            s.clear_all()
+    
+    def calculate(s):
+        try:
+            if not s.operation or s.reset_next_input:
+                return
+            
+            num1_str = s.parse_number(s.previous_input) if s.display_formatted else s.previous_input
+            num2_str = s.get_raw_text()
+            
+            num1 = float(num1_str)
+            num2 = float(num2_str)
+            
+            result = 0
+            if s.operation == '+':
+                result = num1 + num2
+            elif s.operation == '-':
+                result = num1 - num2
+            elif s.operation == '*':
+                result = num1 * num2
+            elif s.operation == '/':
+                if num2 == 0:
+                    raise ZeroDivisionError("تقسیم بر صفر")
+                result = num1 / num2
+            elif s.operation == '**':
+                result = num1 ** num2
+            
+            # تبدیل نتیجه به رشته و حذف .0 اضافی برای اعداد صحیح
+            if result.is_integer():
+                s.current_input = str(int(result))
+            else:
+                s.current_input = str(result)
+                
+            s.operation = None
+            s.reset_next_input = True
+            s.update_display()
+            gs('dingSmallHigh').play()
+            
+        except ZeroDivisionError:
+            s.current_input = 'خطا: تقسیم بر صفر'
+            s.update_display()
+            gs('error').play()
+            teck(2.0, s.clear_all)
+        except Exception as e:
+            s.current_input = f'خطا: {str(e)}'
+            s.update_display()
+            gs('error').play()
+            teck(2.0, s.clear_all)
+    
+    def clear_all(s):
+        s.current_input = '0'
+        s.previous_input = ''
+        s.operation = None
+        s.reset_next_input = False
+        s.update_display()
+        gs('swish').play()
+    
+    def copy_result(s):
+        try:
+            if CIS():
+                from babase import clipboard_set_text
+                # استفاده از متن نمایش داده شده (با ویرگول) برای کپی
+                result = s.get_display_text()
+                clipboard_set_text(result)
+                push(f'کپی شد: {result}', color=(0, 1, 0))
+                gs('dingSmall').play()
+            else:
+                AR.err('کلیپ‌بورد پشتیبانی نمی‌شود!')
+        except Exception as e:
+            AR.err(f'خطا در کپی: {str(e)}')
+    
+    def send_to_chat(s):
+        try:
+            # استفاده از متن نمایش داده شده (با ویرگول) برای ارسال به چت
+            result = s.get_display_text()
+            CM(result)
+            push(f'ارسال شد: {result}', color=(0, 1, 0))
+            gs('dingSmall').play()
+        except Exception as e:
+            AR.err(f'خطا در ارسال: {str(e)}')
+
 # ba_meta require api 9
 # ba_meta export plugin
 class byTaha(Plugin):
@@ -4152,9 +4276,6 @@ class byTaha(Plugin):
         # اورراید کردن توابع اتصال
         setup_connection_overrides()
         
-        # اعمال monkey-patching برای Account Switcher
-        AccountSettingsWindow.__init__ = new_account_settings_init
-        
         # اضافه کردن متغیر آنتی اسپم
         s.last_command_time = {}
         s.cooldown_time = 1.5
@@ -4163,16 +4284,15 @@ class byTaha(Plugin):
         def e(self,*a,**k):
             r = o(self,*a,**k)
             
-            # دکمه Account Switcher با آیکون
-            b_account = AR.bw(
-                icon=gt('ouyaUButton'),
-                position=(self._width+10, self._height-80),
+            b_calculator = AR.bw(
+                icon=gt('egg1'),
+                position=(self._width+10, self._height-48),  # بالاتر از دکمه اصلی
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='اکانت‌ها'
+                label='ماشین حساب'
             )
-            bw(b_account, on_activate_call=Call(AccountSwitcherUI, source=b_account))
+            bw(b_calculator, on_activate_call=Call(Calculator, source=b_calculator))
             
             # دکمه نمادها با آیکون
             b_icons = AR.bw(
@@ -4243,7 +4363,7 @@ class byTaha(Plugin):
             # دکمه اصلی پیام اتوماتیک با آیکون
             b_main = AR.bw(
                 icon=gt('achievementOutline'),
-                position=(self._width+10, self._height-45),
+                position=(self._width+10, self._height-80),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
