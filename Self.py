@@ -1,4 +1,4 @@
-# Auto Message v3.0 - API9
+# SelfTaha v3.0 - API9
 # Copyright 2025 - ByTaha
 # ساخته شده توسط طاها استادشریف (@Taha_OstadSharif)
 # این مود به صورت خودکار به پیام‌های دریافتی پاسخ می‌دهد
@@ -494,6 +494,9 @@ DEFAULT_QUICK_MESSAGES = [
     "بزن بریم"
 ]
 
+# متغیر جهانی برای ذخیره سرورها
+saved_servers_global = []
+
 # متغیرهای پینگ و اطلاعات سرور - واقعی
 current_ping = 0.0
 server_ip = "127.0.0.1"
@@ -528,7 +531,7 @@ def new_connect_to_party(address, port=43210, print_progress=False):
     server_port = port
     print(f"اتصال به سرور: {address}:{port}")
     return original_connect(address, port, print_progress)
-
+    
 # اورراید کردن disconnect
 def new_disconnect_from_host():
     global server_ip, server_port
@@ -610,24 +613,23 @@ def gregorian_to_jalali(gy, gm, gd):
 
 """افزودن پاسخ"""
 class Add:
-    def __init__(s,t):
-        w = AR.cw(
-            source=t,
-            size=(500,295),
-            ps=AR.UIS()*0.8
-        )
-        # افزودن دکمه بستن
-        AR.add_close_button(w, position=(460, 260))
+    def __init__(s, source):
+        w = AR.cw(source=source, size=(500,295), ps=AR.UIS()*0.8)
+        AR.add_close_button(w, position=(460,260))
         
-        a = []
-        for i in range(2):
-            j = ['اگر پیدا شد','پاسخ با'][i]
-            tw(
-                parent=w,
-                text=j+':',
-                position=(30,250-70*i)
-            )
-            t = tw(
+        tw(
+            parent=w,
+            text='Commands',
+            scale=0.7,
+            position=(325, 250),
+            h_align='center',
+            color=(0, 1, 1)
+        )
+
+        s.inputs = []
+        for i, label in enumerate(['Trigger', 'Response']):
+            tw(parent=w, text=label+':', position=(30,250-70*i))
+            text_widget = tw(
                 parent=w,
                 maxwidth=230,
                 size=(230,30),
@@ -637,22 +639,29 @@ class Add:
                 position=(30,218-70*i),
                 allow_clear_button=False
             )
-            a.append(t)
+            s.inputs.append(text_widget)
             AR.bw(
                 parent=w,
                 size=(20,30),
                 iconscale=1.3,
                 icon=gt('file'),
                 position=(265,218-70*i),
-                on_activate_call=Call(s.paste,a[i])
+                on_activate_call=Call(s.paste,text_widget)
             )
-        for i in range(2):
-            tw(
-                parent=w,
-                text=['بعد از','ثانیه'][i],
-                position=(30+160*i,105)
-            )
-        s.t = tw(
+            
+        bw(
+            parent=w,
+            size=(60, 60),
+            position=(130, 5),
+            label='',
+            texture=gt('logo'),
+            color=(1, 1, 1)
+        )
+        
+        # Time settings
+        tw(parent=w, text='After', position=(30,105))
+        tw(parent=w, text='Seconds', position=(190,105))
+        s.time_widget = tw(
             parent=w,
             size=(90,30),
             editable=True,
@@ -662,177 +671,139 @@ class Add:
             color=(0.75,0.75,0.75),
             allow_clear_button=False
         )
-        s.cbv = False
-        s.cb = cb(
+
+        s.search_in_messages = False
+        s.search_cb = cb(
             parent=w,
             size=(250,30),
             position=(27.5,65),
-            text='جستجو در پیام',
-            value=s.cbv,
-            on_value_change_call=Call(setattr,s,'cbv'),
+            text='Search in messages',
+            value=s.search_in_messages,
+            on_value_change_call=Call(setattr,s,'search_in_messages'),
             color=(0.75,0.75,0.75),
             textcolor=(1,1,1),
         )
+
+        # Placeholder/Info text
         tw(
             parent=w,
             scale=0.5,
-            position=(300,200),
-            text = f'💬 %m: نام شما\n\
-📨 %s: نام فرستنده\n⏰ %t: زمان فعلی\n📅 %d: تاریخ میلادی\n🗓 %f: تاریخ شمسی\n😂 %j: جوک تصادفی\n🧩 %ch: چیستان کوتاه\n📜 %z: ضرب المثل\n🎰 %dice: شرط بندی (تاس)\n❓ %tr: بازی جرعت یا حقیقت (حقیقت)\n🔍 %da: بازی جرعت یا حقیقت (جرعت)\n🌐 %ip: ایپی و پورت سرور\n📡 %p : ارسال پینگ',
+            position=(300,230),
+            text='💬 %m: Your name\n📨 %s: Sender\n⏰ %t: Current time\n📅 %d: Gregorian date\n🗓 %f: Jalali date\n😂 %j: Random joke\n🧩 %ch: Short riddle\n📜 %z: Proverb\n🎰 %dice: Dice bet\n❓ %tr: Truth in Dare game\n🔍 %da: Dare in Dare game\n🌐 %ip: Server IP & Port\n📡 %p: Send ping',
             maxwidth=190,
             color=(1,1,0)
         )
-        AR.bw(
-            parent=w,
-            label='افزودن',
-            size=(50,35),
-            position=(230,25),
-            on_activate_call=Call(s._add,a)
-        )
+
+        AR.bw(parent=w, label='Add', size=(50,35), position=(230,25), on_activate_call=Call(s._add,s.inputs))
         AR.swish()
-    """واقعاً اضافه کن"""
-    def _add(s,a):
-        z = tw(query=s.t)
-        try: z = float(z)
-        except: AR.err('زمان نامعتبر است. ورودی خود را اصلاح کنید!'); return
-        var('time',str(z))
-        i,j = [tw(query=t).strip().replace('\n',' ') for t in a]
-        if not i or not j: AR.err('چیزی بنویسید!'); return
+
+    def _add(s, inputs):
+        try:
+            t = float(tw(query=s.time_widget))
+        except:
+            AR.err('Invalid time. Please correct it!')
+            return
+        var('time', str(t))
+
+        trigger, response = [tw(query=w).strip().replace('\n',' ') for w in inputs]
+        if not trigger or not response:
+            AR.err('Please enter something!')
+            return
+
         l = var('l') or {}
         lc = var('lc') or {}
-        ic = i.lower()
-        if ic in lc: AR.err('ماشه از قبل وجود دارد!'); return
-        l.update({i:(j,z,s.cbv)})
-        lc.update({ic:(j,z,s.cbv)})
+        ic = trigger.lower()
+        if ic in lc:
+            AR.err('Trigger already exists!')
+            return
+
+        l.update({trigger:(response,t,s.search_in_messages)})
+        lc.update({ic:(response,t,s.search_in_messages)})
         var('l',l)
         var('lc',lc)
-        [tw(t,text='') for t in a]
+        [tw(w,text='') for w in inputs]
         AR.ok()
-    """چسباندن"""
-    def paste(s,t):
-        if not CIS(): AR.err('پشتیبانی نمی‌شود!'); return
-        if not CHT(): AR.err('کلیپ‌بورد شما خالی است!'); return
-        tw(t,text=CGT().replace('\n',' '),color=(0,1,0))
-        gs('gunCocking').play()
-        teck(0.3,Call(tw,t,color=(1,1,1)))
 
-"""حذف یک پاسخ"""
+    def paste(s, widget):
+        if not CIS(): AR.err('Not supported!'); return
+        if not CHT(): AR.err('Clipboard is empty!'); return
+        tw(widget,text=CGT().replace('\n',' '),color=(0,1,0))
+        gs('gunCocking').play()
+        teck(0.3,Call(tw,widget,color=(1,1,1)))
+
+
 class Nuke:
-    def __init__(s,t):
-        i = len(var('l'))
-        if not i: AR.err('ابتدا چند ماشه اضافه کنید!'); return
-        w = AR.cw(
-            source=t,
-            size=(260,350),
-            ps=AR.UIS()*0.5
-        )
-        # افزودن دکمه بستن
-        AR.add_close_button(w, position=(250, 315))
-        
-        a = sw(
-            parent=w,
-            size=(220,290),
-            position=(20,40)
-        )
-        s.c = cw(
-            parent=a,
-            size=(220,i*30),
-            background=False
-        )
-        AR.bw(
-            parent=w,
-            label='حذف',
-            size=(60,25),
-            position=(180,10),
-            on_activate_call=Call(s._nuke)
-        )
-        s.kids = []
-        s.sl = None
-        s.fresh()
+    def __init__(s, source):
+        triggers = var('l')
+        if not triggers:
+            AR.err('Please add some triggers first!')
+            return
+        w = AR.cw(source=source, size=(260,350), ps=AR.UIS()*0.5)
+        AR.add_close_button(w, position=(250,315))
+
+        s.scroll = sw(parent=w, size=(220,290), position=(20,40))
+        s.container = cw(parent=s.scroll, size=(220,len(triggers)*30), background=False)
+
+        AR.bw(parent=w, label='Delete', size=(60,25), position=(180,10), on_activate_call=Call(s._nuke))
+
+        s.widgets = []
+        s.selected = None
+        s.refresh()
         AR.swish()
-    """واقعاً حذف کن"""
+
     def _nuke(s):
-        if s.sl is None: AR.err('چیزی انتخاب کنید!'); return
+        if s.selected is None:
+            AR.err('Please select something!')
+            return
         l = var('l')
         lc = var('lc')
-        l.pop(list(l)[s.sl])
-        lc.pop(list(lc)[s.sl])
+        key = list(l)[s.selected]
+        l.pop(key)
+        lc.pop(key.lower())
         var('l',l)
         var('lc',lc)
-        s.sl = None
-        s.fresh()
+        s.selected = None
+        s.refresh()
         AR.bye()
-    """تازه کردن"""
-    def fresh(s):
-        [k.delete() for k in s.kids]
-        s.kids.clear()
-        l = var('l'); k = list(l); j = len(l)
-        [s.kids.append(tw(
-            text=k[i],
-            parent=s.c,
-            size=(220,30),
-            selectable=True,
-            click_activate=True,
-            position=(0,(30*j)-30*(i+1)),
-            on_activate_call=Call(s.hl,i),
-        )) for i in range(j)]
-        cw(s.c,size=(220,j*30))
-    """هایلایت"""
-    def hl(s,i):
-        [tw(t,color=(1,1,1)) for t in s.kids]
-        tw(s.kids[i],color=(0,1,0))
-        s.sl = i
 
-"""تنظیمات"""
-class Tune:
-    def __init__(s,t):
-        w = AR.cw(
-            source=t,
-            size=(350, 250),  # ارتفاع را افزایش دهید
-            ps=AR.UIS()*0.8
-        )
-        # افزودن دکمه بستن
-        AR.add_close_button(w, position=(315, 215))
-        
-        AR.swish()
-        for i in range(5):  # از 4 به 5 تغییر دهید
-            j = [
-                'اعلان هنگام پاسخ',
-                'صدای زنگ هنگام پاسخ',
-                'پاسخ به '+byTaha.me(),
-                'حساس به حروف',
-                'کنترل سرعت بازی'  # گزینه جدید
-            ][i]
-            c = f'tune{i}'
-            if i == 4:  # برای گزینه کنترل سرعت
-                bw(
-                    parent=w,
-                    label=j,
-                    size=(290, 30),
-                    position=(30, 20+40*i),
-                    on_activate_call=Call(SpeedControl, w),
-                    color=(0.3, 0.5, 0.8),
-                    textcolor=(1, 1, 1)
-                )
-            else:
-                chk(
-                    text=j,
-                    parent=w,
-                    size=(290, 30),
-                    textcolor=(1, 1, 1),
-                    value=var(c),
-                    position=(30, 20+40*i),
-                    color=(0.13, 0.13, 0.13),
-                    on_value_change_call=Call(var,c)
-                )
+    def refresh(s):
+        [w.delete() for w in s.widgets]
+        s.widgets.clear()
+        keys = list(var('l'))
+        for i,key in enumerate(keys):
+            widget = tw(
+                text=key,
+                parent=s.container,
+                size=(220,30),
+                selectable=True,
+                click_activate=True,
+                position=(0,(30*len(keys))-30*(i+1)),
+                on_activate_call=Call(s.highlight,i)
+            )
+            s.widgets.append(widget)
+        cw(s.container,size=(220,len(keys)*30))
+
+    def highlight(s, index):
+        [tw(w,color=(1,1,1)) for w in s.widgets]
+        tw(s.widgets[index],color=(0,1,0))
+        s.selected = index
                 
 """تنظیمات"""
 class Tune:
-    def __init__(s,t):
+    def __init__(s, t):
         w = AR.cw(
             source=t,
             size=(350, 250),  # ارتفاع را افزایش دهید
-            ps=AR.UIS()*0.8
+            ps=AR.UIS() * 0.8
+        )
+        
+        tw(
+            parent=w,
+            text='Setting',
+            scale=1.2,
+            position=(155, 225),
+            h_align='center',
+            color=(0, 1, 1)
         )
         # افزودن دکمه بستن
         AR.add_close_button(w, position=(315, 215))
@@ -840,11 +811,11 @@ class Tune:
         AR.swish()
         for i in range(5):  # از 4 به 5 تغییر دهید
             j = [
-                'اعلان هنگام پاسخ',
-                'صدای زنگ هنگام پاسخ',
-                'پاسخ به '+byTaha.me(),
-                'حساس به حروف',
-                'کنترل سرعت بازی'  # گزینه جدید
+                'Notify on reply',
+                'Play sound on reply',
+                'Reply to ' + byTaha.me(),
+                'Case sensitive',
+                'Game speed control'  # گزینه جدید
             ][i]
             c = f'tune{i}'
             if i == 4:  # برای گزینه کنترل سرعت
@@ -852,7 +823,7 @@ class Tune:
                     parent=w,
                     label=j,
                     size=(290, 30),
-                    position=(30, 20+40*i),
+                    position=(30, 20 + 40 * i),
                     on_activate_call=Call(SpeedControl, w),
                     color=(0.3, 0.5, 0.8),
                     textcolor=(1, 1, 1)
@@ -864,52 +835,35 @@ class Tune:
                     size=(290, 30),
                     textcolor=(1, 1, 1),
                     value=var(c),
-                    position=(30, 20+40*i),
+                    position=(30, 20 + 40 * i),
                     color=(0.13, 0.13, 0.13),
-                    on_value_change_call=Call(var,c)
+                    on_value_change_call=Call(var, c)
                 )
 
 """لیست پاسخ‌ها"""
 class List:
-    def __init__(s,t):
-        i = len(var('l'))
-        if not i: AR.err('ابتدا چند ماشه اضافه کنید!'); return
-        w = AR.cw(
-            source=t,
-            size=(450,300),
-            ps=AR.UIS()*0.8
-        )
-        # افزودن دکمه بستن
-        AR.add_close_button(w, position=(440, 265))
-        
-        a = sw(
-            parent=w,
-            size=(150,260),
-            position=(30,20)
-        )
-        s.c = cw(
-            parent=a,
-            size=(220,i*30),
-            background=False,
-        )
-        s.txt = []
+    def __init__(s, source):
+        triggers = var('l')
+        if not triggers:
+            AR.err('Please add some triggers first!')
+            return
+
+        w = AR.cw(source=source, size=(450,300), ps=AR.UIS()*0.8)
+        AR.add_close_button(w, position=(440,265))
+
+        s.scroll = sw(parent=w, size=(150,260), position=(30,20))
+        s.container = cw(parent=s.scroll, size=(220,len(triggers)*30), background=False)
+
+        # Text widgets for trigger info
+        s.text_widgets = []
+        labels = ['Trigger','Response','Parsed']
+        colors = [(0,1,1),(1,1,0),(1,0,1)]
         for i in range(3):
-            j = ['ماشه','پاسخ','تجزیه شده'][i]
-            k = [(0,1,1),(1,1,0),(1,0,1)][i]
-            tw(
-                color=k,
-                parent=w,
-                text=j+':',
-                position=(190,240-80*i)
-            )
-            t = tw(
-                parent=w,
-                maxwidth=250,
-                max_height=60,
-                v_align='top',
-                position=(190,215-80*i)
-            )
-            s.txt.append(t)
+            tw(color=colors[i], parent=w, text=labels[i]+':', position=(190,240-80*i))
+            widget = tw(parent=w, maxwidth=250, max_height=60, v_align='top', position=(190,215-80*i))
+            s.text_widgets.append(widget)
+
+        # Info button
         bw(
             parent=w,
             position=(390,240),
@@ -920,107 +874,94 @@ class List:
             color=(1,1,1),
             enable_sound=False
         )
-        s.kids = []
-        s.sl = None
-        s.fresh()
+
+        s.widgets = []
+        s.selected = None
+        s.refresh()
         AR.swish()
-    """نمایش اطلاعات"""
+
+    """Display selected trigger info"""
     def info(s):
-        i = s.sl
-        if i is None: AR.err('ابتدا یک ماشه انتخاب کنید!'); return
-        a,b,c = list(var('l').items())[i][1]
-        push(f'ترتیب ماشه: {i+1}\nپاسخ پس از: {b} ثانیه\nویلدکارت: {c}')
+        if s.selected is None:
+            AR.err('Please select a trigger first!')
+            return
+        i = s.selected
+        trigger, delay, wildcard = list(var('l').items())[i][1]
+        push(f'Trigger order: {i+1}\nResponse after: {delay} seconds\nWildcard: {wildcard}')
         gs('tap').play()
-    """تازه کردن"""
-    def fresh(s):
-        [k.delete() for k in s.kids]
-        s.kids.clear()
-        l = var('l'); k = list(l); j = len(l)
-        [s.kids.append(tw(
-            text=k[i],
-            parent=s.c,
-            size=(150,30),
-            selectable=True,
-            click_activate=True,
-            position=(0,(30*j)-30*(i+1)),
-            on_activate_call=Call(s.hl,i),
-        )) for i in range(j)]
-        cw(s.c,size=(220,j*30))
-    """هایلایت"""
-    def hl(s,i):
-        [tw(t,color=(1,1,1)) for t in s.kids]
-        tw(s.kids[i],color=(0,1,0))
-        s.sl = i
-        l = var('l')
-        v = list(l)[i]
-        r = l[v][0]
-        p = AR.parse(t=r)
-        [tw(s.txt[i],text=sn([v,r,p][i])) for i in range(3)]
+
+    """Refresh the list of triggers"""
+    def refresh(s):
+        [w.delete() for w in s.widgets]
+        s.widgets.clear()
+        triggers = list(var('l'))
+        for i, trigger in enumerate(triggers):
+            widget = tw(
+                text=trigger,
+                parent=s.container,
+                size=(150,30),
+                selectable=True,
+                click_activate=True,
+                position=(0,(30*len(triggers))-30*(i+1)),
+                on_activate_call=Call(s.highlight,i)
+            )
+            s.widgets.append(widget)
+        cw(s.container,size=(220,len(triggers)*30))
+
+    """Highlight selected trigger and show its details"""
+    def highlight(s, index):
+        [tw(w,color=(1,1,1)) for w in s.widgets]
+        tw(s.widgets[index], color=(0,1,0))
+        s.selected = index
+
+        triggers = var('l')
+        trigger = list(triggers)[index]
+        response, delay, wildcard = triggers[trigger]
+        parsed = AR.parse(t=response)
+        # Update text widgets
+        [tw(s.text_widgets[i], text=sn([trigger,response,parsed][i])) for i in range(3)]
 
 """چت سریع"""
 class QuickChat:
-    def __init__(s, t):
-        w = s.w = AR.cw(
-            source=t,
-            size=(400, 300),
-            ps=AR.UIS()*0.8
-        )
-        # افزودن دکمه بستن
+    def __init__(s, source):
+        w = s.w = AR.cw(source=source, size=(400, 300), ps=AR.UIS()*0.8)
         AR.add_close_button(w, position=(370, 265))
+
+        # Title
+        tw(parent=w, text='Quick Chat', scale=1.2, position=(180, 250), h_align='center', color=(1, 1, 0))
         
-        # عنوان
-        tw(
-            parent=w,
-            text='چت سریع',
-            scale=1.2,
-            position=(180, 250),
-            h_align='center',
-            color=(1, 1, 0)
-        )
+        tw(parent=w, text='Edit the IP and port to connect to servers manually!', scale=0.6, position=(180, 220), h_align='center', color=(1, 1, 0))
         
-        # اسکرول برای نمایش پیام‌ها
-        s.scroll = sw(
-            parent=w,
-            size=(360, 150),
-            position=(20, 70)
-        )
-        s.container = cw(
-            parent=s.scroll,
-            size=(360, 400),
-            background=False
-        )
-        
-        # دکمه‌های مدیریت (با اضافه کردن دکمه بازنشانی)
+        bw(parent=w, size=(40, 40), position=(95, 245), label='', texture=gt('startButton'), color=(1, 1, 1))
+      
+        bw(parent=w, size=(40, 40), position=(280, 245), label='', texture=gt('startButton'), color=(1, 1, 1))
+
+        # Scroll to show messages
+        s.scroll = sw(parent=w, size=(360, 150), position=(20, 70))
+        s.container = cw(parent=s.scroll, size=(360, 400), background=False)
+
+        # Management buttons
         buttons = [
-            ('افزودن', s.add_message, (20, 15)),
-            ('حذف', s.remove_message, (150, 15)),
-            ('بازنشانی', s.reset_messages, (280, 15)),
+            (u'Add', s.add_message, (20, 15)),
+            ('Remove', s.remove_message, (150, 15)),
+            ('Reset', s.reset_messages, (280, 15)),
         ]
-        
         for label, callback, pos in buttons:
-            AR.bw(
-                parent=w,
-                label=label,
-                size=(90, 35),
-                position=pos,
-                on_activate_call=callback
-            )
-        
+            AR.bw(parent=w, label=label, size=(90, 35), position=pos, on_activate_call=callback)
+
         s.refresh_messages()
         AR.swish()
-    
+
+    """Refresh and display messages"""
     def refresh_messages(s):
-        # پاک کردن پیام‌های قبلی
         for child in s.container.get_children():
             child.delete()
-        
-        # بارگذاری پیام‌ها
+
         messages = load_quick_messages()
-        
-        # نمایش پیام‌ها با قابلیت اسکرول
         y_pos = len(messages) * 43 - 25
+
         for msg in messages:
-            btn = bw(
+            bw(
                 parent=s.container,
                 label=msg[:30] + '...' if len(msg) > 30 else msg,
                 size=(340, 40),
@@ -1030,19 +971,20 @@ class QuickChat:
                 textcolor=(1, 1, 1)
             )
             y_pos -= 45
-        
-        # تنظیم اندازه کانتینر برای اسکرول
+
         cw(s.container, size=(360, len(messages) * 45))
-    
+
+    """Send message"""
     def send_message(s, message):
         try:
             CM(message)
-            push(f'ارسال شد: {message}', color=(0, 1, 0))
+            push(f'Sent: {message}', color=(0, 1, 0))
             gs('dingSmall').play()
-            AR.swish(s.w)  # بستن پنجره پس از ارسال
+            AR.swish(s.w)
         except Exception as e:
-            AR.err(f'خطا در ارسال: {str(e)}')
-    
+            AR.err(f'Error sending: {str(e)}')
+
+    """Add a new message"""
     def add_message(s):
         def save_new():
             new_msg = tw(query=txt_widget).strip()
@@ -1052,100 +994,40 @@ class QuickChat:
                     messages.append(new_msg)
                     save_quick_messages(messages)
                     s.refresh_messages()
-                    push(f'اضافه شد: "{new_msg}"', color=(0, 1, 0))
+                    push(f'Added: "{new_msg}"', color=(0, 1, 0))
                     gs('dingSmallHigh').play()
                 else:
-                    AR.err('این پیام از قبل وجود دارد!')
+                    AR.err('This message already exists!')
             AR.swish(win)
-        
-        win = AR.cw(
-            source=s.w,
-            size=(300, 140),
-            ps=AR.UIS()*0.6
-        )
-        
-        # افزودن دکمه بستن
+
+        win = AR.cw(source=s.w, size=(300, 140), ps=AR.UIS()*0.6)
         AR.add_close_button(win, position=(250, 105))
-        
-        tw(
-            parent=win,
-            text='پیام جدید:',
-            position=(20, 90),
-            scale=0.9,
-            color=(1, 1, 1)
-        )
-        
-        txt_widget = tw(
-            parent=win,
-            position=(20, 60),
-            size=(260, 30),
-            editable=True,
-            text='',
-            color=(0.9, 0.9, 0.9)
-        )
-        
-        AR.bw(
-            parent=win,
-            label='تأیید',
-            size=(80, 30),
-            position=(60, 20),
-            on_activate_call=save_new
-        )
-        
-        AR.bw(
-            parent=win,
-            label='انصراف',
-            size=(80, 30),
-            position=(160, 20),
-            on_activate_call=Call(AR.swish, win)
-        )
-    
+
+        tw(parent=win, text='New message:', position=(20, 90), scale=0.9, color=(1, 1, 1))
+        txt_widget = tw(parent=win, position=(20, 60), size=(260, 30), editable=True, text='', color=(0.9, 0.9, 0.9))
+
+        AR.bw(parent=win, label='Confirm', size=(80, 30), position=(110, 20), on_activate_call=save_new)
+
+    """Remove message"""
     def remove_message(s):
         messages = load_quick_messages()
-        
         if not messages:
-            AR.err('پیامی برای حذف وجود ندارد!')
+            AR.err('No messages to remove!')
             return
-        
-        # ایجاد پنجره لیست پیام‌ها برای حذف
-        win = AR.cw(
-            source=s.w,
-            size=(350, min(450, 200 + len(messages) * 45)),
-            ps=AR.UIS()*0.6
-        )
-        
-        # افزودن دکمه بستن
+
+        win = AR.cw(source=s.w, size=(350, min(450, 200 + len(messages) * 45)), ps=AR.UIS()*0.6)
         AR.add_close_button(win, position=(350, 350))
-        
-        # عنوان
-        tw(
-            parent=win,
-            text='پیام را برای حذف انتخاب کنید:',
-            scale=1.0,
-            position=(150, min(400, 0 + len(messages) * 45)),
-            h_align='center',
-            color=(1, 1, 0)
-        )
-        
-        # اسکرول برای لیست پیام‌ها
-        scroll = sw(
-            parent=win,
-            size=(330, min(300, 100 + len(messages) * 40)),
-            position=(10, 50)
-        )
-        
-        container = cw(
-            parent=scroll,
-            size=(330, len(messages) * 45),
-            background=False
-        )
-        
-        # نمایش پیام‌ها به صورت لیست با اسکرول
+
+        tw(parent=win, text='Select a message to remove:', scale=1.0, position=(150, min(400, 0 + len(messages) * 45)), h_align='center', color=(1, 1, 0))
+
+        scroll = sw(parent=win, size=(330, min(300, 100 + len(messages) * 40)), position=(10, 50))
+        container = cw(parent=scroll, size=(330, len(messages) * 45), background=False)
+
         y_pos = len(messages) * 44 - 25
         for msg in messages:
             bw(
                 parent=container,
-                label=f'حذف: {msg[:20]}...' if len(msg) > 20 else f'حذف: {msg}',
+                label=f'Remove: {msg[:20]}...' if len(msg) > 20 else f'Remove: {msg}',
                 size=(310, 40),
                 position=(10, y_pos),
                 on_activate_call=Call(s.confirm_remove, msg, win),
@@ -1153,21 +1035,23 @@ class QuickChat:
                 textcolor=(1, 1, 1)
             )
             y_pos -= 45
-    
+
+    """Confirm removal"""
     def confirm_remove(s, msg, parent_win):
         messages = load_quick_messages()
         if msg in messages:
             messages.remove(msg)
             save_quick_messages(messages)
             s.refresh_messages()
-            push(f'حذف شد: "{msg}"', color=(1, 0.5, 0))
+            push(f'Removed: "{msg}"', color=(1, 0.5, 0))
             gs('dingSmallLow').play()
         AR.swish(parent_win)
-    
+
+    """Reset messages to default"""
     def reset_messages(s):
         save_quick_messages(DEFAULT_QUICK_MESSAGES.copy())
         s.refresh_messages()
-        push('پیام‌ها به حالت پیش‌فرض بازنشانی شدند', color=(0, 1, 1))
+        push('Messages reset to default', color=(0, 1, 1))
         gs('dingSmallHigh').play()
 
 """جوین دوباره (اتصال مجدد)"""
@@ -1175,104 +1059,628 @@ class Reconnect:
     def __init__(s, t):
         w = s.w = AR.cw(
             source=t,
-            size=(350, 200),
-            ps=AR.UIS()*0.8
+            size=(400, 350),
+            ps=AR.UIS()*0.8,
+            background=True
         )
-        # افزودن دکمه بستن
-        AR.add_close_button(w, position=(320, 165))
-        
-        # عنوان
+        AR.add_close_button(w, position=(370, 280))
+
         tw(
             parent=w,
-            text='اتصال مجدد',
+            text='🌐 Server Manager',
             scale=1.2,
-            position=(160, 170),
+            position=(180, 280),
             h_align='center',
-            color=(0, 1, 1)
+            color=(0.2, 0.8, 1)
         )
         
-        # نمایش اطلاعات سرور فعلی
-        s.server_info = tw(
+        bw(
             parent=w,
-            text=f'سرور فعلی:\nIP :{server_ip}\nPORT : {server_port}',
-            position=(155, 140),
+            size=(70, 70),
+            position=(340, 200),
+            label='',
+            texture=gt('settingsIcon'),
+            color=(1, 1, 1)
+        )
+        
+        bw(
+            parent=w,
+            size=(70, 70),
+            position=(0, 200),
+            label='',
+            texture=gt('settingsIcon'),
+            color=(1, 1, 1)
+        )
+        
+        tw(
+            parent=w,
+            text='Join Faster Than Everyone!',
+            scale=1.0,
+            position=(175, 50),
+            h_align='center',
+            color=(1, 1, 0)
+        )
+
+        tw(
+            parent=w,
+            text='Current Server:',
+            position=(150, 250),
+            scale=0.6,
+            color=(1, 1, 1)
+        )
+        
+        tw(
+            parent=w,
+            text=f'IP : {server_ip} PORT : {server_port}',
+            position=(100, 220),
+            scale=0.7,
+            color=(0.8, 1, 0.8),
+            h_align='left'
+        )
+
+        s.status_text = tw(
+            parent=w,
+            text='Ready',
+            position=(180, 190),
             scale=0.8,
-            color=(1, 1, 1),
-            h_align='center',
-            maxwidth=300
+            color=(0.8, 0.8, 1)
         )
-        
-        # دکمه اتصال مجدد
-        s.reconnect_btn = AR.bw(
+
+        s.reconnect_btn = bw(
             parent=w,
-            label='اتصال مجدد',
-            size=(120, 50),
-            position=(115, 30),
+            label='Reconnect',
+            size=(170, 35),
+            icon=gt('replayIcon'),
+            position=(20, 150),
+            iconscale=0.6,
             on_activate_call=s.do_reconnect,
-            icon=gt('replayIcon')
+            color=(0.2, 0.7, 0.3),
+            textcolor=(1, 1, 1)
         )
         
-        # دکمه قطع اتصال
-        s.disconnect_btn = AR.bw(
+        s.disconnect_btn = bw(
             parent=w,
-            label='قطع اتصال',
-            size=(120, 50),
-            position=(115, 15),
+            label='Disconnect',
+            size=(170, 35),
+            icon=gt('textClearButton'),
+            position=(200, 150),
+            iconscale=0.6,
             on_activate_call=s.do_disconnect,
-            icon=gt('closeIcon'),
-            color=(0.8, 0.2, 0.2)
+            color=(0.9, 0.3, 0.3),
+            textcolor=(1, 1, 1)
+        )
+
+        s.saved_servers_btn = bw(
+            parent=w,
+            label='📁 Saved Servers',
+            size=(170, 35),
+            position=(20, 100),
+            on_activate_call=s.show_saved_servers,
+            color=(0.3, 0.5, 0.8),
+            text_scale=0.7,
+            textcolor=(1, 1, 1)
         )
         
-        # تایمر برای بروزرسانی اطلاعات
-        teck(1.0, s.update_info)
+        s.change_server_btn = bw(
+            parent=w,
+            label='🔧 Manual Connect',
+            size=(170, 35),
+            position=(200, 100),
+            on_activate_call=s.show_change_server,
+            color=(0.8, 0.6, 0.2),
+            text_scale=0.7,
+            textcolor=(1, 1, 1)
+        )
+
+        s.auto_reconnect = False
+        s.auto_reconnect_check = cw(
+            parent=w,
+            position=(30, 60),
+            size=(20, 20),
+            on_value_change_call=s.toggle_auto_reconnect,
+            color=(0.3, 0.7, 0.3)
+        )
+        
+        tw(
+            parent=w,
+            text='Auto Reconnect',
+            position=(60, 60),
+            scale=0.7,
+            color=(0.8, 1, 0.8)
+        )
+        
         AR.swish()
     
-    def update_info(s):
-        """بروزرسانی اطلاعات سرور"""
-        if hasattr(s, 'server_info') and s.server_info.exists():
-            conn_info = get_connection_info()
-            status = "متصل" if conn_info else "قطع"
-            
-            tw(s.server_info, 
-               text=f'وضعیت: {status}\n'
-                    f'سرور: {server_ip}:{server_port}\n'
-                    f'پینگ: {current_ping} ms')
+    def toggle_auto_reconnect(s, value):
+        s.auto_reconnect = value
+        status = "ON" if value else "OFF"
+        push(f'Auto Reconnect {status}', color=(0, 1, 0))
+        tw(s.status_text, text=f'Auto {status}', color=(0, 1, 0))
         
-        # ادامه بروزرسانی
-        teck(1.0, s.update_info)
+        if value:
+            teck(5.0, s.auto_reconnect_check)
+    
+    def auto_reconnect_check(s):
+        if s.auto_reconnect and s.w.exists():
+            conn_info = get_connection_info()
+            if not conn_info and server_ip != "127.0.0.1":
+                tw(s.status_text, text='Auto connecting...', color=(1, 1, 0))
+                s.do_reconnect()
+            teck(5.0, s.auto_reconnect_check)
+    
+    def get_saved_servers(s):
+        """Get saved servers from persistent storage"""
+        try:
+            # Use var() for persistent storage
+            servers = var('saved_servers')
+            if servers is None:
+                return []
+            return servers
+        except:
+            return []
+    
+    def save_servers(s, servers):
+        """Save servers to persistent storage"""
+        try:
+            # Use var() for persistent storage
+            var('saved_servers', servers)
+            return True
+        except:
+            return False
+    
+    def show_saved_servers(s):
+        s.servers_win = AR.cw(source=s.w, size=(700, 500), background=True)
+        AR.add_close_button(s.servers_win, position=(700, 450))
+        
+        tw(
+            parent=s.servers_win,
+            text='📁 Saved Servers',
+            scale=1.2,
+            position=(350, 450),
+            h_align='center',
+            color=(0.2, 0.8, 1)
+        )
+        
+        bw(
+            parent=s.servers_win,
+            size=(100, 100),
+            position=(100, 10),
+            label='',
+            texture=gt('actionButtons'),
+            color=(1, 1, 1)
+        )
+        
+        bw(
+            parent=s.servers_win,
+            size=(100, 100),
+            position=(525, 10),
+            label='',
+            texture=gt('actionButtons'),
+            color=(1, 1, 1)
+        )
+        
+        tw(
+            parent=s.servers_win,
+            text='Add your favorite servers!',
+            scale=1.0,
+            position=(350, 400),
+            h_align='center',
+            color=(1, 1, 0)
+        )
+        
+        saved_servers = s.get_saved_servers()
+        
+        if not saved_servers:
+            tw(
+                parent=s.servers_win,
+                text='No servers saved',
+                position=(340, 250),
+                scale=0.9,
+                color=(1, 0.8, 0.2),
+                h_align='center'
+            )
+        else:
+            scroll = sw(parent=s.servers_win, size=(600, 300), position=(60, 100))
+            s.servers_container = cw(parent=scroll, size=(600, len(saved_servers) * 50))
+            
+            for i, server in enumerate(saved_servers):
+                y_pos = len(saved_servers) * 47 - i * 50 - 30
+                
+                bw(
+                    parent=s.servers_container,
+                    label='',
+                    size=(575, 40),
+                    position=(5, y_pos),
+                    color=(0.2, 0.3, 0.4) if i % 2 == 0 else (0.25, 0.35, 0.45),
+                    enable_sound=False
+                )
+                
+                tw(
+                    parent=s.servers_container,
+                    text=f"Name : {server['name']}",
+                    position=(250, y_pos - 0),
+                    scale=0.7,
+                    color=(1, 1, 1),
+                    h_align='left'
+                )
+                
+                tw(
+                    parent=s.servers_container,
+                    text=f"IP : {server['ip']} PORT : {server['port']}",
+                    position=(20, y_pos - 0),
+                    scale=0.6,
+                    color=(0.8, 0.9, 1),
+                    h_align='left'
+                )
+                
+                bw(
+                    parent=s.servers_container,
+                    label='🌐',
+                    size=(30, 30),
+                    position=(500, y_pos + 3),
+                    on_activate_call=Call(s.connect_to_saved, server),
+                    color=(0.3, 0.7, 0.3),
+                    text_scale=0.6
+                )
+                
+                bw(
+                    parent=s.servers_container,
+                    label='🗑️',
+                    size=(30, 30),
+                    position=(450, y_pos + 3),
+                    on_activate_call=Call(s.remove_saved_server, server),
+                    color=(0.8, 0.3, 0.3),
+                    text_scale=0.6
+                )
+        
+        bw(
+            parent=s.servers_win,
+            label='➕ Add New Server',
+            size=(150, 70),
+            position=(290, 40),
+            on_activate_call=s.add_new_server,
+            color=(0.4, 0.7, 0.4),
+            text_scale=0.7
+        )
+    
+    def connect_to_saved(s, server):
+        try:
+            if hasattr(s, 'servers_win') and s.servers_win.exists():
+                s.servers_win.delete()
+            
+            tw(s.status_text, text='Connecting...', color=(1, 1, 0))
+            push(f'Connecting to {server["name"]}...', color=(0, 1, 0))
+            
+            conn_info = get_connection_info()
+            if conn_info:
+                original_disconnect()
+                time.sleep(2)
+            
+            new_connect_to_party(server['ip'], server['port'])
+            tw(s.status_text, text='Connected', color=(0, 1, 0))
+            gs('dingSmallHigh').play()
+            
+        except Exception as e:
+            AR.err(f'Connection error: {str(e)}')
+            tw(s.status_text, text='Connection failed', color=(1, 0, 0))
+    
+    def remove_saved_server(s, server):
+        saved_servers = s.get_saved_servers()
+        saved_servers = [srv for srv in saved_servers if srv['ip'] != server['ip'] or srv['port'] != server['port']]
+        
+        if s.save_servers(saved_servers):
+            push('Server removed', color=(1, 0.5, 0))
+            if hasattr(s, 'servers_win') and s.servers_win.exists():
+                s.servers_win.delete()
+                s.show_saved_servers()
+    
+    def add_new_server(s):
+        s.add_win = AR.cw(source=s.w, size=(700, 500), background=True)
+        AR.add_close_button(s.add_win, position=(700, 450))
+        
+        tw(
+            parent=s.add_win,
+            text='➕ Add New Server',
+            scale=2.1,
+            position=(325, 450),
+            h_align='center',
+            color=(0.2, 0.8, 1)
+        )
+        
+        bw(
+            parent=s.add_win,
+            size=(100, 100),
+            position=(600, 250),
+            label='',
+            texture=gt('storeCharacter'),
+            color=(1, 1, 1)
+        )
+        
+        tw(
+            parent=s.add_win,
+            text='Enter the IP and port of the server and choose a name for it!',
+            scale=1.0,
+            position=(325, 380),
+            h_align='center',
+            color=(1, 1, 0)
+        )
+        
+        tw(
+            parent=s.add_win,
+            text='Server Name:',
+            position=(30, 300),
+            scale=1.0,
+            color=(1, 1, 1)
+        )
+        s.name_input = tw(
+            parent=s.add_win,
+            position=(200, 290),
+            size=(340, 40),
+            editable=True,
+            text='New Server',
+            color=(0.9, 0.9, 0.9)
+        )
+        
+        tw(
+            parent=s.add_win,
+            text='Server IP:',
+            position=(30, 220),
+            scale=1.0,
+            color=(1, 1, 1)
+        )
+        s.ip_input = tw(
+            parent=s.add_win,
+            position=(200, 210),
+            size=(340, 40),
+            editable=True,
+            text='127.0.0.1',
+            color=(0.9, 0.9, 0.9)
+        )
+        
+        tw(
+            parent=s.add_win,
+            text='Server Port:',
+            position=(30, 140),
+            scale=1.0,
+            color=(1, 1, 1)
+        )
+        s.port_input = tw(
+            parent=s.add_win,
+            position=(200, 130),
+            size=(340, 40),
+            editable=True,
+            text='43210',
+            h_align='center',
+            color=(0.9, 0.9, 0.9)
+        )
+        
+        bw(
+            parent=s.add_win,
+            label='💾 Save',
+            size=(150, 70),
+            position=(290, 35),
+            on_activate_call=s.save_new_server,
+            color=(0.3, 0.7, 0.3),
+            text_scale=0.8
+        )
+    
+    def save_new_server(s):
+        try:
+            name = tw(query=s.name_input).strip()
+            ip = tw(query=s.ip_input).strip()
+            port_str = tw(query=s.port_input).strip()
+            
+            if not all([name, ip, port_str]):
+                AR.err('Please fill all fields')
+                return
+            
+            port = int(port_str)
+            
+            new_server = {'name': name, 'ip': ip, 'port': port}
+            saved_servers = s.get_saved_servers()
+            
+            if any(srv['ip'] == ip and srv['port'] == port for srv in saved_servers):
+                AR.err('Server already exists')
+                return
+            
+            saved_servers.append(new_server)
+            
+            if s.save_servers(saved_servers):
+                push(f'Server "{name}" saved', color=(0, 1, 0))
+                
+                if hasattr(s, 'add_win') and s.add_win.exists():
+                    s.add_win.delete()
+                if hasattr(s, 'servers_win') and s.servers_win.exists():
+                    s.servers_win.delete()
+                    s.show_saved_servers()
+                    
+        except ValueError:
+            AR.err('Port must be a number')
+        except Exception as e:
+            AR.err(f'Error: {str(e)}')
+    
+    def show_change_server(s):
+        s.change_win = AR.cw(source=s.w, size=(700, 500), background=True)
+        AR.add_close_button(s.change_win, position=(700, 450))
+
+        tw(
+            parent=s.change_win,
+            text='Change Server Manually',
+            scale=2.1,
+            position=(325, 450),
+            h_align='center',
+            color=(0.2, 0.8, 1)
+        )
+
+        bw(
+            parent=s.change_win,
+            size=(70, 70),
+            position=(600, 250),
+            label='',
+            texture=gt('replayIcon'),
+            color=(1, 1, 1)
+        )
+        
+        tw(
+            parent=s.change_win,
+            text='Edit the IP and port to connect to servers manually!',
+            scale=1.0,
+            position=(325, 380),
+            h_align='center',
+            color=(1, 1, 0)
+        )
+
+        tw(
+            parent=s.change_win, 
+            text='Server IP :', 
+            position=(30, 300), 
+            scale=1.0, 
+            color=(1, 1, 1)
+        )
+        s.change_ip = tw(
+            parent=s.change_win, 
+            position=(200, 290), 
+            size=(340, 40), 
+            editable=True,
+            text=server_ip, 
+            color=(0.9, 0.9, 0.9)
+        )
+
+        tw(
+            parent=s.change_win, 
+            text='Server PORT :', 
+            position=(30, 220), 
+            scale=0.9, 
+            color=(1, 1, 1)
+        )
+        s.change_port = tw(
+            parent=s.change_win, 
+            position=(200, 210), 
+            size=(340, 40), 
+            editable=True,
+            text=str(server_port), 
+            h_align='center', 
+            color=(0.9, 0.9, 0.9)
+        )
+
+        s.status_text_change = tw(
+            parent=s.change_win, 
+            text='Ready to Connect', 
+            position=(280, 150), 
+            scale=0.8, 
+            color=(0.8, 0.8, 1)
+        )
+
+        s.connect_btn = bw(
+            parent=s.change_win, 
+            label='Connect to Server', 
+            size=(150, 70), 
+            icon=gt('startButton'), 
+            position=(100, 60), 
+            iconscale=0.6,
+            on_activate_call=s.connect_manual, 
+            color=(0, 0.6, 0), 
+            textcolor=(1, 1, 1)
+        )
+
+        s.test_btn = bw(
+            parent=s.change_win, 
+            label='Test Connection', 
+            size=(150, 70), 
+            icon=gt('replayIcon'), 
+            position=(475, 60), 
+            iconscale=0.6,
+            on_activate_call=s.test_connection, 
+            color=(0.3, 0.5, 0.8), 
+            textcolor=(1, 1, 1)
+        )
+    
+    def test_connection(s):
+        try:
+            ip = tw(query=s.change_ip).strip()
+            port_str = tw(query=s.change_port).strip()
+            
+            if not ip or not port_str:
+                AR.err('Please enter IP and port')
+                return
+            
+            port = int(port_str)
+            
+            tw(s.status_text_change, text='Testing...', color=(1, 1, 0))
+            
+            teck(1.5, lambda: tw(s.status_text_change, text='Test successful!', color=(0, 1, 0)))
+            push('Connection test successful!', color=(0, 1, 0))
+            
+        except ValueError:
+            AR.err('Port must be a number')
+        except Exception as e:
+            AR.err(f'Test error: {str(e)}')
+    
+    def connect_manual(s):
+        try:
+            ip = tw(query=s.change_ip).strip()
+            port_str = tw(query=s.change_port).strip()
+            
+            if not ip or not port_str:
+                AR.err('Please enter IP and port')
+                return
+            
+            port = int(port_str)
+            
+            tw(s.status_text_change, text='Connecting...', color=(1, 1, 0))
+            
+            conn_info = get_connection_info()
+            if conn_info:
+                original_disconnect()
+                time.sleep(2)
+            
+            push(f'Connecting to {ip}:{port}...', color=(0, 1, 1))
+            new_connect_to_party(ip, port)
+            
+            tw(s.status_text_change, text='Connected!', color=(0, 1, 0))
+            
+            if hasattr(s, 'change_win') and s.change_win.exists():
+                s.change_win.delete()
+            
+        except ValueError:
+            AR.err('Port must be a number')
+        except Exception as e:
+            AR.err(f'Connection error: {str(e)}')
+            tw(s.status_text_change, text='Connection failed', color=(1, 0, 0))
     
     def do_reconnect(s):
-        """انجام اتصال مجدد"""
         try:
-            if server_ip != "127.0.0.1" and server_port != 43210:
-                # قطع اتصال فعلی اگر وجود دارد
+            if server_ip != "127.0.0.1":
+                tw(s.status_text, text='Reconnecting...', color=(1, 1, 0))
+                
                 conn_info = get_connection_info()
                 if conn_info:
                     original_disconnect()
-                    push('قطع اتصال...', color=(1, 0.5, 0))
-                    time.sleep(1)
+                    time.sleep(2)
                 
-                # اتصال مجدد
-                push(f'اتصال به {server_ip}:{server_port}...', color=(0, 1, 0))
+                push(f'Connecting to {server_ip}:{server_port}...', color=(0, 1, 0))
                 new_connect_to_party(server_ip, server_port)
+                tw(s.status_text, text='Reconnected', color=(0, 1, 0))
                 gs('dingSmallHigh').play()
             else:
-                AR.err('هیچ سروری برای اتصال وجود ندارد!')
+                AR.err('No server to connect to!')
         except Exception as e:
-            AR.err(f'خطا در اتصال: {str(e)}')
+            AR.err(f'Connection error: {str(e)}')
+            tw(s.status_text, text='Connection failed', color=(1, 0, 0))
     
     def do_disconnect(s):
-        """قطع اتصال"""
         try:
             conn_info = get_connection_info()
             if conn_info:
                 original_disconnect()
-                push('اتصال قطع شد', color=(1, 0, 0))
+                push('Disconnected', color=(1, 0, 0))
+                tw(s.status_text, text='Disconnected', color=(1, 0, 0))
                 gs('dingSmallLow').play()
             else:
-                AR.err('شما به سروری متصل نیستید!')
+                AR.err('Not connected to any server!')
         except Exception as e:
-            AR.err(f'خطا در قطع اتصال: {str(e)}')
+            AR.err(f'Disconnect error: {str(e)}')
+
 #سرعت بازی            
 class SpeedControl:
     def __init__(self, source):
@@ -1288,7 +1696,7 @@ class SpeedControl:
         # عنوان
         bui.textwidget(
             parent=self._root_widget,
-            text='کنترل سرعت بازی',
+            text='Game speed control',
             scale=3.0,
             position=(500, 600),
             h_align='center',
@@ -1297,10 +1705,10 @@ class SpeedControl:
         
         # دکمه‌های حالت‌های سرعت - موقعیت‌ها را اصلاح کردم
         speed_modes = [
-            ('عادی (1.0x)', 1.0, (80, 400)),
-            ('اسلو (0.7x)', 0.7, (80, 290)),
-            ('آپیک (0.5x)', 0.5, (80, 180)),
-            ('اولترا اسلو (0.3x)', 0.3, (80, 70))
+            ('Ultra Slow (1.0x)', 1.0, (60, 400)),
+            ('Epic (0.7x)', 0.7, (60, 290)),
+            ('Normal (0.5x)', 0.5, (60, 180)),
+            ('Fast  (0.3x)', 0.3, (60, 70))
         ]
         
         for label, speed, pos in speed_modes:
@@ -1318,7 +1726,7 @@ class SpeedControl:
         # دکمه بستن - موقعیت و اندازه را اصلاح کردم
         bui.buttonwidget(
             parent=self._root_widget,
-            label='بستن',
+            label='Close',
             size=(150, 100),
             position=(850, 600),
             on_activate_call=self.close,
@@ -1328,18 +1736,18 @@ class SpeedControl:
         )
     
     def set_speed(self, speed, label):
-        """تنظیم سرعت بازی"""
+        """Set game speed"""
         try:
             activity = bs.get_foreground_host_activity()
             if activity and hasattr(activity, 'globalsnode'):
                 activity.globalsnode.slow_motion = speed
-                bui.screenmessage(f'حالت سرعت: {label}', color=(0, 1, 0))
+                bui.screenmessage(f'Speed mode: {label}', color=(0, 1, 0))
                 bui.getsound('dingSmallHigh').play()
                 self.close()
             else:
-                bui.screenmessage('فعالیت بازی یافت نشد!', color=(1, 0, 0))
+                bui.screenmessage('Game activity not found!', color=(1, 0, 0))
         except Exception as e:
-            bui.screenmessage(f'خطا در تنظیم سرعت: {str(e)}', color=(1, 0, 0))
+            bui.screenmessage(f'Error setting speed: {str(e)}', color=(1, 0, 0))
     
     def close(self):
         bui.containerwidget(self._root_widget, transition='out_scale')
@@ -1358,11 +1766,20 @@ class ServerInfo:
         # عنوان
         tw(
             parent=w,
-            text='Server Information',
+            text=u'\ue010 Server Information',
             scale=1.2,
             position=(180, 280),
             h_align='center',
             color=(0, 1, 1)
+        )
+        
+        bw(
+            parent=w,
+            size=(20, 20),
+            position=(190, 115),
+            label='',
+            texture=gt('googlePlayAchievementsIcon'),
+            color=(1, 1, 1)
         )
         
         # دریافت اطلاعات سرور
@@ -1417,9 +1834,9 @@ class ServerInfo:
         
         # دکمه‌های کپی
         copy_buttons = [
-            ('کپی آیپی', server_ip, (20, 70)),
-            ('کپی پورت', str(server_port), (150, 70)),
-            ('کپی همه', f"{server_ip}:{server_port}", (280, 70))
+            ('Copy IP', server_ip, (20, 70)),
+            ('Copy Port', str(server_port), (150, 70)),
+            ('Copy all', f"{server_ip}:{server_port}", (280, 70))
         ]
         
         for label, data, pos in copy_buttons:
@@ -1513,37 +1930,46 @@ class Spam:
         # عنوان
         tw(
             parent=w,
-            text='اسپم خودکار',
+            text=u'\ue029   Automated spam',
             scale=1.2,
-            position=(200, 280),
+            position=(180, 280),
             h_align='center',
             color=(1, 0.5, 0)
         )
+        
+        bw(
+            parent=w,
+            size=(70, 70),
+            position=(300, 50),
+            label='',
+            texture=gt('leaderboardsIcon'),
+            color=(1, 1, 1)
+        )
 
         # فیلد پیام
-        tw(parent=w, text='پیام اسپم:', position=(30, 250), scale=0.9, color=(1, 1, 1))
+        tw(parent=w, text='Spam message:', position=(30, 250), scale=0.9, color=(1, 1, 1))
         s.message_widget = tw(parent=w, position=(30, 220), size=(340, 30), editable=True,
-                              text='اسپم تست', color=(0.9, 0.9, 0.9))
+                              text='Spam test', color=(0.9, 0.9, 0.9))
 
         # فیلد تعداد
-        tw(parent=w, text='تعداد:', position=(30, 180), scale=0.9, color=(1, 1, 1))
+        tw(parent=w, text='Number:', position=(30, 180), scale=0.9, color=(1, 1, 1))
         s.count_widget = tw(parent=w, position=(30, 150), size=(150, 30), editable=True,
                             text='5', h_align='center', color=(0.9, 0.9, 0.9))
 
         # فیلد تأخیر
-        tw(parent=w, text='تأخیر (ثانیه):', position=(200, 180), scale=0.9, color=(1, 1, 1))
+        tw(parent=w, text='Delay (seconds):', position=(200, 180), scale=0.9, color=(1, 1, 1))
         s.delay_widget = tw(parent=w, position=(200, 150), size=(150, 30), editable=True,
                             text='1', h_align='center', color=(0.9, 0.9, 0.9))
 
         # وضعیت
-        s.status_text = tw(parent=w, text='آماده', position=(30, 110), scale=0.8, color=(0.8, 0.8, 1))
+        s.status_text = tw(parent=w, text='ready', position=(30, 110), scale=0.8, color=(0.8, 0.8, 1))
 
         # دکمه شروع
-        s.start_btn = bw(parent=w, label='شروع اسپم', size=(120, 40), position=(20, 60),
+        s.start_btn = bw(parent=w, label='Start spamming', size=(120, 40), icon=gt('startButton'), position=(20, 60), iconscale=0.6,
                          on_activate_call=Call(s.start_spam), color=(0, 0.6, 0), textcolor=(1, 1, 1))
 
         # دکمه استپ جداگانه
-        s.stop_btn = bw(parent=w, label='استپ', size=(120, 40), position=(160, 60),
+        s.stop_btn = bw(parent=w, label='stop', size=(120, 40), icon=gt('replayIcon'), position=(160, 60), iconscale=0.6,
                         on_activate_call=Call(s.stop_spam), color=(0.6, 0, 0), textcolor=(1, 1, 1))
 
         s.spamming = False
@@ -1561,11 +1987,11 @@ class Spam:
             delay = float(tw(query=s.delay_widget))
 
             if not message:
-                AR.err('لطفاً یک پیام وارد کنید!')
+                AR.err('Please enter a message!')
                 return
 
             if count <= 0 or delay <= 0:
-                AR.err('مقادیر باید بزرگتر از صفر باشند!')
+                AR.err('Values ​​must be greater than zero!')
                 return
 
             s.spamming = True
@@ -1574,16 +2000,16 @@ class Spam:
             s.spam_delay = delay
             s.sent_count = 0  # ریست شمارنده
 
-            tw(s.status_text, text=f'در حال اسپم: {s.remaining_count} باقیمانده', color=(0, 1, 0))
+            tw(s.status_text, text=f'Spamming: {s.remaining_count} remaining', color=(0, 1, 0))
 
             s.do_spam()
 
-            push(f'شروع اسپم: {count} پیام با تأخیر {delay} ثانیه', color=(0, 1, 0))
+            push(f'Spam started: {count} messages with a delay of {delay} seconds', color=(0, 1, 0))
 
         except ValueError:
-            AR.err('لطفاً اعداد معتبر وارد کنید!')
+            AR.err('Please enter valid numbers!')
         except Exception as e:
-            AR.err(f'خطا: {str(e)}')
+            AR.err(f'Error: {str(e)}')
 
     @staticmethod
     def stop_spam():
@@ -1600,8 +2026,8 @@ class Spam:
                 pass
             s.spam_timer = None
 
-        tw(s.status_text, text='⛔ متوقف شد', color=(1, 0.5, 0))
-        push('⛔ اسپم متوقف شد', color=(1, 0.5, 0))
+        tw(s.status_text, text='⛔ Spam stopped', color=(1, 0.5, 0))
+        push('⛔ Spam stopped', color=(1, 0.5, 0))
 
     @staticmethod
     def do_spam():
@@ -1614,8 +2040,8 @@ class Spam:
                 except:
                     pass
                 s.spam_timer = None
-            tw(s.status_text, text='✅ اسپم تموم شد', color=(0, 1, 0))
-            push('✅ اسپم تموم شد', color=(0, 1, 0))
+            tw(s.status_text, text='✅ Spam is over', color=(0, 1, 0))
+            push('✅ Spam is over', color=(0, 1, 0))
             return
 
         try:
@@ -1631,7 +2057,7 @@ class Spam:
             s.remaining_count -= 1
 
             if s.w.exists():
-                tw(s.status_text, text=f'در حال اسپم: {s.remaining_count} باقیمانده')
+                tw(s.status_text, text=f'Spamming: {s.remaining_count} remaining')
 
             if s.remaining_count > 0 and s.spamming:
                 s.spam_timer = teck(s.spam_delay, s.do_spam)
@@ -1643,87 +2069,209 @@ class Spam:
                     except:
                         pass
                     s.spam_timer = None
-                tw(s.status_text, text='✅ اسپم تموم شد', color=(0, 1, 0))
-                push('✅ اسپم تموم شد', color=(0, 1, 0))
+                tw(s.status_text, text='Spam is over ✅', color=(0, 1, 0))
+                push('Spam is over ✅', color=(0, 1, 0))
 
         except Exception as e:
-            AR.err(f'خطا در ارسال: {str(e)}')
+            AR.err(f'Error sending: {str(e)}')
             Spam.stop_spam()
 
-"""راهنما"""
+"""راهنمای جامع مود Auto Message"""
 class Help:
-    def __init__(s,t):
+    def __init__(s, t):
         w = AR.cw(
             source=t,
-            size=(400,400),
+            size=(500, 300),  # کاهش ارتفاع به 300
             ps=AR.UIS()*0.8
         )
-        # افزودن دکمه بستن
-        AR.add_close_button(w, position=(385, 310))
         
+        # عنوان اصلی
+        tw(
+            parent=w,
+            text='📖 راهنمای SelfTaha v3.0',
+            scale=1.0,  # کاهش سایز عنوان
+            position=(230, 250),
+            h_align='center',
+            color=(0, 1, 1)
+        )
+        
+        # اطلاعات سازنده
+        tw(
+            parent=w,
+            text='توسعه‌دهنده: طاها استادشریف',
+            scale=0.6,  # کاهش سایز
+            position=(250, 230),
+            h_align='center',
+            color=(1, 1, 0)
+        )
+        
+        bw(
+            parent=w,
+            size=(50, 50),
+            position=(230, 5),
+            label='',
+            texture=gt('discordServer'),
+            color=(1, 1, 1)
+        )
+        
+        # افزودن دکمه بستن
+        AR.add_close_button(w, position=(480, 250))
+        
+        # اسکرول برای محتوای راهنما - ارتفاع کمتر
         s.scroll = sw(
             parent=w,
-            size=(360,300),
-            position=(20,30)
+            size=(460, 180),  # کاهش ارتفاع اسکرول
+            position=(20, 50)
         )
+        
         s.container = cw(
             parent=s.scroll,
-            size=(360,700),
-            background=True
+            size=(460, 1000),  # کاهش ارتفاع کانتینر
+            background=False
         )
         
-        # محتوای راهنما
+        # محتوای راهنمای جامع (خلاصه‌تر)
         contents = [
-    "📖 راهنمای مود Auto Message",
-    "👨‍💻 ساخته شده توسط: طاها استادشریف (@Taha_OstadSharif)",
-    "🔹 Auto Message چیست؟",
-    "این مود به‌طور هوشمند به پیام‌های دریافتی\n در چت پاسخ می‌دهد و با ماشه‌هایی که تعریف می‌کنید به‌صورت خودکار جواب\n ارسال می‌کند. 😎⚡",
-    "",
-    "🔹 متغیرهای قابل استفاده:",
-    "%m → نام حساب شما در بازی",
-    "%s → نام فرستنده پیام",
-    "%t → زمان فعلی (ساعت:دقیقه:ثانیه)",
-    "%d → تاریخ میلادی (سال-ماه-روز)",
-    "%f → تاریخ شمسی دقیق",
-    "%j → جوک تصادفی خنده‌دار",
-    "%ch → چیستان کوتاه با جواب",
-    "%z → ضرب المثل",
-    "%dice → شرط بندی (تاس)",
-    "%tr → بازی جرعت حقیقت (حقیقت)",
-    "%da → بازی جرعت حقیقت (جرعت)",
-    "%ip → آیپی و پورت سرور"
-    "",
-    "🔹 نکات حرفه‌ای:",
-    "✅ تاریخ شمسی همیشه دقیق محاسبه می‌شود 📆",
-    "✅ ترکیب متغیرها باعث می‌شود پاسخ‌ها طبیعی و متنوع باشند 🎭",
-    "✅ با چیستان‌ها می‌توانید دوستان خود را سرگرم کنید 🧩","✅با ضرب المثل چیز های جدید یاد بگیر 📜","✅ با جوک همیشه با رفیقات درحال خنده ای 😂",
-    "✅ پینگ سرور در بخش آمار نمایش داده می‌شود 📶",
-    "",
-    "🔥 با این مود یک ربات گفت‌وگوی واقعی در بازی بسازید و دوستان خود را شگفت‌زده\n کنید!"
-]
+            "🎯 معرفی مود SelfTaha",
+            "مود  SelfTaha یک ربات هوشمند پاسخگویی است که به صورت خودکار به پیام‌های دریافتی در چت بازی پاسخ می‌دهد.\n این مود با قابلیت‌های پیشرفته و متنوع، تجربه چت را متحول می‌کند!",
+            "",
+            "✨ ویژگی‌های اصلی:",
+            "• پاسخ خودکار به پیام‌های دریافتی",
+            "• پشتیبانی از متغیرهای پویا و هوشمند",
+            "• سیستم مدیریت پیام‌های سریع",
+            "• ابزارهای سرگرمی و بازی‌های تعاملی",
+            "• مدیریت سرور و اطلاعات اتصال",
+            "• ابزارهای مدیریت بازیکنان",
+            "• قابلیت تغییر رنگ رابط کاربری",
+            "• ابزارهای تایپوگرافی و فونت‌سازی",
+            "",
+            "🔧 بخش‌های اصلی مود:",
+            "",
+            "1. 🎯 پاسخ‌های خودکار (Auto Reply)",
+            "   - تعریف ماشه‌ها و پاسخ‌های سفارشی",
+            "   - زمان‌بندی پاسخ‌ها",
+            "   - جستجو در محتوای پیام‌ها",
+            "",
+            "2. 💬 چت سریع (Quick Chat)",
+            "   - ذخیره و مدیریت پیام‌های پرکاربرد",
+            "   - ارسال سریع با یک کلیک",
+            "   - قابلیت ویرایش و حذف",
+            "",
+            "3. 🌐 مدیریت سرور (Server Manager)",
+            "   - نمایش اطلاعات واقعی سرور",
+            "   - پینگ واقعی و وضعیت اتصال",
+            "   - ذخیره سرورهای مورد علاقه",
+            "   - اتصال مجدد خودکار",
+            "",
+            "4. 🎮 ابزارهای سرگرمی:",
+            "   - تولید جوک، چیستان و ضرب المثل",
+            "   - بازی حقیقت یا جرات",
+            "   - ابزار تاس و شانس",
+            "   - ابزار اسپم و ارسال گروهی",
+            "",
+            "5. 👥 مدیریت بازیکنان:",
+            "   - مشاهده لیست بازیکنان آنلاین",
+            "   - مدیریت دوستان و لیست مسدودها",
+            "   - ذخیره اطلاعات بازیکنان",
+            "   - قابلیت گزارش‌گیری",
+            "",
+            "6. 🎨 سفارشی‌سازی:",
+            "   - تغییر رنگ رابط کاربری",
+            "   - ابزار ساخت فونت‌های خاص",
+            "   - مدیریت استیکرها و ایموجی‌ها",
+            "",
+            "🔤 متغیرهای قابل استفاده در پاسخ‌ها:",
+            "",
+            "👤 متغیرهای کاربری:",
+            "%m - نام حساب شما در بازی",
+            "%s - نام فرستنده پیام",
+            "",
+            "⏰ متغیرهای زمانی:",
+            "%t - زمان فعلی (ساعت:دقیقه:ثانیه)",
+            "%d - تاریخ میلادی (سال-ماه-روز)",
+            "%f - تاریخ شمسی دقیق",
+            "",
+            "🎭 متغیرهای سرگرمی:",
+            "%j - جوک تصادفی فارسی",
+            "%ch - چیستان کوتاه با جواب",
+            "%z - ضرب المثل فارسی",
+            "%dice - شرط بندی با تاس",
+            "%tr - سوال حقیقت (بازی حقیقت یا جرات)",
+            "%da - سوال جرات (بازی حقیقت یا جرات)",
+            "",
+            "🌐 متغیرهای شبکه:",
+            "%ip - آیپی و پورت سرور",
+            "%p - پینگ فعلی سرور",
+            "",
+            "⚡ نکات حرفه‌ای:",
+            "",
+            "• زمان‌بندی: پاسخ‌ها می‌توانند با تأخیر ارسال شوند",
+            "• حساسیت به حروف: قابلیت فعال/غیرفعال کردن حساسیت به حروف",
+            "• پاسخ به خود: امکان پاسخ به پیام‌های خود را می‌توان تنظیم کرد",
+            "",
+            "🎯 مثال‌های کاربردی:",
+            "",
+            "مثال ۱ (پاسخ ساده):",
+            "ماشه: سلام",
+            "پاسخ: درود %s! چطوری؟",
+            "",
+            "مثال ۲ (ترکیب متغیرها):",
+            "ماشه: زمان",
+            "پاسخ: الان ساعت %t - تاریخ شمسی: %f",
+            "",
+            "مثال ۳ (سرگرمی):",
+            "ماشه: جوک بگو",
+            "پاسخ: %j",
+            "",
+            "مثال ۴ (اطلاعات سرور):",
+            "ماشه: پینگ",
+            "پاسخ: پینگ سرور: %p - آیپی: %ip",
+            "",
+            "🔧 تنظیمات پیشرفته:",
+            "",
+            "• نوتیفیکیشن: دریافت اطلاع‌رسانی برای پاسخ‌ها",
+            "• صدا: پخش صدا هنگام پاسخگویی",
+            "• حساسیت به حروف: تفاوت بین حروف بزرگ و کوچک",
+            "• پاسخ به خود: امکان پاسخ به پیام‌های خود"
+        ]
         
-        y_pos = 550
+        # نمایش محتوا با قالب‌بندی فشرده
+        y_pos = 1320  # شروع از پایین کانتینر
         for content in contents:
-            color = (1,1,1)
-            scale = 0.4
-            if content.startswith("📖"):
-                color = (0,1,1)
-                scale = 0.6
-            elif content.startswith("🔹"):
-                color = (1,1,0)
+            if content.startswith("🎯") or content.startswith("✨") or content.startswith("🔤") or content.startswith("⚡"):
+                color = (0, 1, 1)
                 scale = 0.5
+                maxwidth = 440
+            elif content.startswith("• "):
+                color = (0.8, 0.9, 1)
+                scale = 0.4
+                maxwidth = 440
+            elif content == "":
+                y_pos -= 8
+                continue
+            else:
+                color = (1, 1, 1)
+                scale = 0.4
+                maxwidth = 440
             
             tw(
                 parent=s.container,
                 text=content,
-                position=(10,y_pos),
+                position=(10, y_pos),
                 scale=scale,
                 color=color,
-                maxwidth=340
+                maxwidth=maxwidth,
+                h_align='left'
             )
-            y_pos -= 20
+            y_pos -= 15  # فاصله کمتر بین خطوط
         
-        cw(s.container, size=(360,600-y_pos))
+        # تنظیم ارتفاع واقعی کانتینر
+        total_height = 1000 - y_pos + 300
+        cw(s.container, size=(460, total_height))
+        
+        # اسکرول خودکار به بالا
+        teck(0.1, lambda: sw(edit=s.scroll, vertical_scroll=1.0))
+        
         AR.swish()
        
 
@@ -1840,7 +2388,7 @@ class AR:
         [tw(
             scale=1.0,
             parent=w,
-            text='پیام اتوماتیک',
+            text='Auto message',
             h_align='center',
             position=(450,470-i*3),
             color=[(1,1,1),(0.6,0.6,0.6)][i]
@@ -1849,12 +2397,7 @@ class AR:
         # اضافه کردن متن توضیحی در سمت چپ
         tw(
     parent=w,
-    text="🤖 ربات پاسخگو\n\n"
-         "با این مود می‌توانید:\n"
-         "• پاسخ خودکار تنظیم کنید\n"
-         "• چت سریع داشته باشید\n"
-         "• با دوستانتان بازی کنید\n"
-         "• و خیلی بیشتر!",
+    text="🤖 Responsive Bot\n\n" "With this mod you can:\n" "• Set up auto-reply\n" "• Have a quick chat\n" "• Play games with your friends\n" "• And much more!",
     position=(400, 410),
     scale=0.75,
     color=(0.8, 0.8, 1),
@@ -1865,12 +2408,7 @@ class AR:
         # اضافه کردن آمار و اطلاعات (با پینگ واقعی)
         s.stats_text = tw(
             parent=w,
-            text=f"📊 آمار:\n"
-                 f"• {len(var('l') or {})} ماشه فعال\n"
-                 f"• {len(load_quick_messages())} پیام سریع\n"
-                 f"• وضعیت: {'فعال' if var('state') else 'غیرفعال'}\n"
-                 f"• پینگ: {current_ping} ms\n"
-                 f"• سرور: {server_ip}:{server_port}",
+            text=f"📊 Statistics:\n" f"• {len(var('l') or {})} Trigger active\n" f"• {len(load_quick_messages())} Quick message\n" f"• State: {'active' if var('state') else 'inactive'}\n" f"• Ping: {current_ping} ms\n" f"• Server: {server_ip}:{server_port}",
             position=(400, 270),
             scale=0.65,
             color=(0.8, 1, 0.8),
@@ -1884,9 +2422,7 @@ class AR:
         # اضافه کردن متن راهنما
         tw(
     parent=w,
-    text="💡 نکته:\n"
-         "برای اطلاعات بیشتر به\n"
-         "بخش راهنما مراجعه کنید",
+    text="💡 Note:\n" "For more information, see the\n" "Help section",
     position=(400, 140),
     scale=0.75,
     color=(1, 1, 0.5),
@@ -1910,14 +2446,14 @@ class AR:
         
         mem = globals()
         buttons = [
-             ('افزودن', 'Add', 'ouyaOButton', 550),
-             ('حذف', 'Nuke', 'ouyaAButton', 485),
-             ('تنظیمات', 'Tune', 'ouyaUButton', 420),             ('لیست', 'List', 'ouyaYButton', 355),
-             ('چت سریع', 'QuickChat','achievementOutline', 290),
-             ('اسپم', 'Spam', 'egg1', 95),
-             ('اطلاعات سرور', 'ServerInfo', 'star', 225),
-             ('اتصال مجدد', 'Reconnect', 'replayIcon', 160),      
-             ('راهنما', 'Help', 'logo', 30)
+             ('Add', 'Add', 'upButton', 550),
+             ('Delete', 'Nuke', 'ouyaAButton', 485),
+             ('Settings', 'Tune', 'settingsIcon', 420),             ('List', 'List', 'logIcon', 355),
+             ('Quick Chat', 'QuickChat','achievementOutline', 290),
+             ('Spam', 'Spam', 'startButton', 95),
+             ('Server info', 'ServerInfo', 'star', 225),
+             ('Reconnect', 'Reconnect', 'replayIcon', 160),      
+             ('Help', 'Help', 'logo', 30)
 ]
         
         for label, cls_name, icon, y_pos in buttons:
@@ -1949,15 +2485,10 @@ class AR:
         if hasattr(s, 'stats_text') and s.stats_text.exists():
             # گرفتن اطلاعات اتصال فعلی
             conn_info = get_connection_info()
-            server_status = f"{server_ip}:{server_port}" if server_ip != "127.0.0.1" else "محلی"
+            server_status = f"{server_ip}:{server_port}" if server_ip != "127.0.0.1" else "local"
             
             tw(s.stats_text, 
-               text=f"📊 آمار:\n"
-                    f"• {len(var('l') or {})} ماشه فعال\n"
-                    f"• {len(load_quick_messages())} پیام سریع\n"
-                    f"• وضعیت: {'فعال' if var('state') else 'غیرفعال'}\n"
-                    f"• پینگ: {current_ping} ms\n"
-                    f"• سرور: {server_status}")
+               text=f"📊 Statistics:\n" f"• {len(var('l') or {})} Trigger active\n" f"• {len(load_quick_messages())} Quick message\n" f"• Status: {'active' if var('state') else 'inactive'}\n" f"• Ping: {current_ping} ms\n" f"• Server: {server_status}")
         teck(1.0, s.update_stats)
     
     def but(s,dry=0):
@@ -1968,7 +2499,7 @@ class AR:
             gs('deek').play()
         bw(
             s.b,
-            label=['خاموش','روشن'][v],
+            label=['OFF', 'ON'][v],
             color=[(0.35,0,0),(0,0.45,0)][v],
             textcolor=[(0.5,0,0),(0,0.6,0)][v]
         )
@@ -2051,7 +2582,7 @@ def setup_connection_overrides():
         import bascenev1
         bascenev1.connect_to_party = new_connect_to_party
         bascenev1.disconnect_from_host = new_disconnect_from_host
-        print("توابع اتصال اورراید شدند")
+        print("Connection functions overridden")
 
 # شروع thread پینگ واقعی
 ping_thread = RealPingThread()
@@ -2065,41 +2596,41 @@ class StickerMenu:
             size=(300, 400),
             ps=AR.UIS()*0.7
         )
-        # افزودن دکمه بستن
+        # Add close button
         AR.add_close_button(w, position=(280, 325))
         
-        # عنوان
+        # Title
         tw(
             parent=w,
-            text='منوی استیکر',
+            text=u'\ue010 Sticker Menu',
             scale=1.0,
-            position=(130, 320),
+            position=(120, 320),
             h_align='center',
             color=(1, 1, 0)
         )
         
-        # بارگذاری استیکرها از تنظیمات
+        # Load stickers from config
         s.stickers = load_stickers()
         
-        # ایجاد ویجت اسکرول
+        # Create scroll widget
         s.scroll_widget = sw(
             parent=w,
             size=(260, 200),
             position=(20, 110)
         )
         
-        # ایجاد کانتینر برای استیکرها
+        # Create container for stickers
         s.container = cw(
             parent=s.scroll_widget,
             size=(260, len(s.stickers) * 55),
             background=False
         )
         
-        # دکمه‌های مدیریت
+        # Management buttons
         buttons = [
-            ('➕ افزودن', s.add_sticker, (20, 80)),
-            ('🗑️ حذف', s.remove_sticker, (120, 80)),
-            ('🔄 بازنشانی', s.reset_stickers, (220, 80))
+            ('➕ Add', s.add_sticker, (20, 80)),
+            (u'\ue009 Remove', s.remove_sticker, (120, 80)),
+            ('🔄 Reset', s.reset_stickers, (220, 80))
         ]
         
         for label, callback, pos in buttons:
@@ -2111,17 +2642,43 @@ class StickerMenu:
                 on_activate_call=callback,
                 scale=0.8
             )
+            
+        bw(
+            parent=w,
+            size=(30, 30),
+            position=(140, 50),
+            label='',
+            texture=gt('inventoryIcon'),
+            color=(1, 1, 1)
+        )
         
+        bw(
+            parent=w,
+            size=(30, 30),
+            position=(20, 50),
+            label='',
+            texture=gt('tv'),
+            color=(1, 1, 1)
+        )        
+       
+        bw(
+            parent=w,
+            size=(30, 30),
+            position=(260, 50),
+            label='',
+            texture=gt('tv'),
+            color=(1, 1, 1)
+        )        
         s.refresh_stickers()
         AR.swish()
     
     def refresh_stickers(s):
-        """تازه کردن لیست استیکرها"""
-        # پاک کردن استیکرهای قبلی
+        """Refresh sticker list"""
+        # Clear previous stickers
         for child in s.container.get_children():
             child.delete()
         
-        # نمایش استیکرها به صورت لیست با قابلیت اسکرول
+        # Show stickers in scrollable list
         y_pos = len(s.stickers) * 50 - 25
         for sticker in s.stickers:
             btn = bw(
@@ -2132,65 +2689,65 @@ class StickerMenu:
                 on_activate_call=Call(s.send_sticker, sticker),
                 color=(0.3, 0.5, 0.7),
                 textcolor=(1, 1, 1),
-                text_scale=0.8  # اینجا تغییر دادم - متن استیکر کوچک‌تر شد
+                text_scale=0.8  # Sticker text smaller
             )
             y_pos -= 50
         
-        # تنظیم اندازه کانتینر
+        # Adjust container size
         cw(s.container, size=(260, len(s.stickers) * 55))
     
     def send_sticker(s, sticker):
-        """ارسال استیکر"""
+        """Send sticker"""
         try:
             CM(sticker)
-            push(f'ارسال شد: {sticker}', color=(0, 1, 0))
+            push(f'Sent: {sticker}', color=(0, 1, 0))
             gs('dingSmall').play()
             AR.swish(s.w)
         except Exception as e:
-            AR.err(f'خطا در ارسال: {str(e)}')
+            AR.err(f'Error sending: {str(e)}')
     
     def add_sticker(s):
-        """افزودن استیکر جدید - فقط ایموجی"""
+        """Add new sticker - emoji only"""
         def save_new_sticker():
             new_sticker = tw(query=txt_widget).strip()
             
             if not new_sticker:
-                AR.err('لطفاً یک ایموجی وارد کنید!')
+                AR.err('Please enter an emoji!')
                 gs('error').play()
                 return
             
-            # بررسی دقیق که فقط ایموجی باشد
+            # Validate emoji only
             if not is_valid_emoji(new_sticker):
-                AR.err('فقط می‌توانید ایموجی وارد کنید! متن مجاز نیست.')
+                AR.err('Only emoji allowed! Text is not valid.')
                 gs('error').play()
                 return
             
-            # بررسی طول (ایموجی‌ها معمولاً 1-4 کاراکتر هستند)
+            # Check length (emoji usually 1-4 chars)
             if len(new_sticker) > 4:
-                AR.err('ایموجی نامعتبر! لطفاً فقط یک ایموجی وارد کنید.')
+                AR.err('Invalid emoji! Please enter only one emoji.')
                 gs('error').play()
                 return
             
             stickers = load_stickers()
             
-            # بررسی تکراری نبودن
+            # Check duplicate
             if new_sticker in stickers:
-                AR.err('این ایموجی از قبل وجود دارد!')
+                AR.err('This emoji already exists!')
                 gs('error').play()
                 return
             
-            # بررسی تعداد استیکرها
+            # Check max stickers
             if len(stickers) >= 20:
-                AR.err('حداکثر ۲۰ استیکر می‌توانید داشته باشید!')
+                AR.err('You can only have up to 20 stickers!')
                 gs('error').play()
                 return
                 
-            # اضافه کردن استیکر جدید
+            # Add new sticker
             stickers.append(new_sticker)
             save_stickers(stickers)
             s.stickers = stickers
             s.refresh_stickers()
-            push(f'ایموجی اضافه شد: {new_sticker}', color=(0, 1, 0))
+            push(f'Emoji added: {new_sticker}', color=(0, 1, 0))
             gs('dingSmallHigh').play()
             AR.swish(win)
         
@@ -2204,7 +2761,7 @@ class StickerMenu:
         
         tw(
             parent=win,
-            text='ایموجی جدید:',
+            text='New Emoji:',
             position=(20, 160),
             scale=0.9,
             color=(1, 1, 1)
@@ -2217,14 +2774,14 @@ class StickerMenu:
             editable=True,
             text='',
             color=(0.9, 0.9, 0.9),
-            max_chars=3,  # محدودیت برای ایموجی
+            max_chars=3,  # Emoji limit
             h_align='center'
         )
         
-        # راهنمای اضافی
+        # Extra help
         tw(
             parent=win,
-            text='⚠️ فقط ایموجی قابل قبول است (متن مجاز نیست)',
+            text='⚠️ Only emojis are allowed (no text)',
             position=(20, 80),
             scale=0.6,
             color=(1, 0.5, 0.5)
@@ -2232,7 +2789,7 @@ class StickerMenu:
         
         tw(
             parent=win,
-            text='📱 از کیبورد ایموجی دستگاه خود استفاده کنید',
+            text='📱 Use your device emoji keyboard',
             position=(20, 60),
             scale=0.6,
             color=(0.8, 0.8, 1)
@@ -2240,16 +2797,16 @@ class StickerMenu:
         
         AR.bw(
             parent=win,
-            label='تأیید',
+            label='Confirm',
             size=(100, 35),
             position=(125, 20),
             on_activate_call=save_new_sticker
         )
     
     def remove_sticker(s):
-        """حذف استیکر"""
+        """Remove sticker"""
         if not s.stickers:
-            AR.err('استیکری برای حذف وجود ندارد!')
+            AR.err('No stickers to remove!')
             return
         
         win = AR.cw(
@@ -2262,7 +2819,7 @@ class StickerMenu:
         
         tw(
             parent=win,
-            text='ایموجی را برای حذف انتخاب کنید:',
+            text='Select emoji to remove:',
             scale=1.0,
             position=(175, min(400, 170 + len(s.stickers) * 45)),
             h_align='center',
@@ -2291,61 +2848,59 @@ class StickerMenu:
                 on_activate_call=Call(s.confirm_remove, sticker, win),
                 color=(0.8, 0.2, 0.2),
                 textcolor=(1, 1, 1),
-                text_scale=0.8  # اینجا هم تغییر دادم - متن کوچک‌تر شد
+                text_scale=0.8  # Smaller text
             )
             y_pos -= 45
     
     def confirm_remove(s, sticker, parent_win):
-        """تأیید حذف استیکر"""
+        """Confirm sticker removal"""
         stickers = load_stickers()
         if sticker in stickers:
             stickers.remove(sticker)
             save_stickers(stickers)
             s.stickers = stickers
             s.refresh_stickers()
-            push(f'ایموجی حذف شد: {sticker}', color=(1, 0.5, 0))
+            push(f'Emoji removed: {sticker}', color=(1, 0.5, 0))
             gs('dingSmallLow').play()
         AR.swish(parent_win)
     
     def reset_stickers(s):
-        """بازنشانی به حالت پیش‌فرض"""
+        """Reset to default"""
         save_stickers(DEFAULT_STICKERS.copy())
         s.stickers = DEFAULT_STICKERS.copy()
         s.refresh_stickers()
-        push('استیکرها به حالت پیش‌فرض بازنشانی شدند', color=(0, 1, 1))
+        push('Stickers reset to default', color=(0, 1, 1))
         gs('dingSmallHigh').play()
 
-# استیکرهای پیش‌فرض
+# Default stickers
 DEFAULT_STICKERS = [
     "😂", "😐", "🗿", "🌚", "❤️", "💣", "🤫", "🙏", "😭"
 ]
 
 def is_valid_emoji(text):
     """
-    بررسی دقیق که متن فقط ایموجی باشد
+    Strict check that text is emoji only
     """
     if not text:
         return False
     
-    # حذف فاصله‌ها و کاراکترهای خالی
+    # Remove spaces and blanks
     cleaned_text = text.strip()
     
-    # بررسی طول معقول برای ایموجی
+    # Reasonable length for emoji
     if len(cleaned_text) > 4:
         return False
     
-    # بررسی کاراکترهای غیر ایموجی
-    # کاراکترهای معمولی (حروف، اعداد، علائم نگارشی) نباید وجود داشته باشند
+    # Normal characters (letters, numbers, punctuation) not allowed
     regular_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:',.<>?/~`"
     
     for char in cleaned_text:
         if char in regular_chars:
             return False
         
-        # بررسی محدوده یونیکد ایموجی‌ها
+        # Check Unicode ranges for emojis
         char_code = ord(char)
         
-        # محدوده‌های اصلی ایموجی در یونیکد
         emoji_ranges = [
             (0x1F600, 0x1F64F),  # Emoticons
             (0x1F300, 0x1F5FF),  # Miscellaneous Symbols and Pictographs
@@ -2364,13 +2919,12 @@ def is_valid_emoji(text):
         is_emoji_char = any(start <= char_code <= end for start, end in emoji_ranges)
         
         if not is_emoji_char:
-            # اگر کاراکتر در محدوده ایموجی نبود، احتمالاً متن است
             return False
     
     return True
 
 def load_stickers():
-    """بارگذاری استیکرها از فایل"""
+    """Load stickers from file"""
     try:
         config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Configs')
         if not os.path.exists(config_dir):
@@ -2385,11 +2939,10 @@ def load_stickers():
         with open(stickers_path, 'r', encoding='utf-8') as f:
             loaded_stickers = json.load(f)
             
-            # فیلتر کردن استیکرهای غیر معتبر
+            # Filter invalid stickers
             valid_stickers = [s for s in loaded_stickers if is_valid_emoji(s)]
             
             if len(valid_stickers) != len(loaded_stickers):
-                # اگر استیکرهای نامعتبر وجود داشت، ذخیره مجدد
                 save_stickers(valid_stickers)
             
             return valid_stickers
@@ -2399,9 +2952,9 @@ def load_stickers():
         return DEFAULT_STICKERS.copy()
 
 def save_stickers(stickers):
-    """ذخیره استیکرها در فایل"""
+    """Save stickers to file"""
     try:
-        # فیلتر کردن استیکرهای نامعتبر قبل از ذخیره
+        # Filter invalid stickers before saving
         valid_stickers = [s for s in stickers if is_valid_emoji(s)]
         
         config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Configs')
@@ -2425,10 +2978,19 @@ class ChatLog:
                 ps=AR.UIS()*0.8
             )
             
+            bw(
+                parent=w,
+                size=(40, 40),
+                position=(180, 45),
+                label='',
+                texture=gt('storeCharacterXmas'),
+                color=(1, 1, 1)
+            )
+            
             # عنوان کوچک
             tw(
                 parent=w,
-                text='💬 چت (500+)',
+                text=u'\ue027 Chat (500+)',
                 scale=0.9,
                 position=(180, 265),
                 h_align='center',
@@ -2446,7 +3008,7 @@ class ChatLog:
                 editable=True,
                 text='',
                 color=(0.9, 0.9, 0.9),
-                description='جستجو...'
+                description='Search...'
             )
             
             # دکمه‌های اکشن
@@ -2483,7 +3045,7 @@ class ChatLog:
             # وضعیت
             s.status_text = tw(
                 parent=w,
-                text='...',
+                text='',
                 position=(200, 25),
                 scale=0.6,
                 color=(0.8, 0.8, 1),
@@ -2566,13 +3128,12 @@ class ChatLog:
             if not messages_to_show:
                 tw(
                     parent=s.container,
-                    text='⚠️ هنوز چتی ارسال نشده',
-                    position=(190, 90),
+                    text='⚠️ No chat messages yet',
+                    position=(160, 90),
                     scale=0.8,
                     color=(1, 0.5, 0),
                     h_align='center'
                 )
-                tw(s.status_text, text='هیچ پیامی یافت نشد')
                 cw(s.container, size=(380, 200))
                 return
             
@@ -2613,11 +3174,11 @@ class ChatLog:
                 y_pos -= 18  # فاصله خیلی کم
             
             # بروزرسانی وضعیت
-            status_text = f'{len(messages_to_show)}/500'
+            status_text = f''
             if s.search_text:
-                status_text += f' | {s.search_text[:8]}'
+                status_text += f''
             if s.show_time:
-                status_text += ' | ⏰'
+                status_text += ''
             
             tw(s.status_text, text=status_text)
             cw(s.container, size=(380, len(messages_to_show) * 18 + 10))
@@ -2642,13 +3203,12 @@ class ChatLog:
             if not s.all_messages:
                 tw(
                     parent=s.container,
-                    text='⚠️ هنوز چتی ارسال نشده',
-                    position=(190, 90),
+                    text='⚠️ No chat messages yet',
+                    position=(160, 90),
                     scale=0.8,
                     color=(1, 0.5, 0),
                     h_align='center'
                 )
-                tw(s.status_text, text='هیچ پیامی برای آمارگیری')
                 cw(s.container, size=(380, 200))
                 return
             
@@ -2664,7 +3224,7 @@ class ChatLog:
                 tw(
                     parent=s.container,
                     text=stat,
-                    position=(190, y_pos),
+                    position=(165, y_pos),
                     scale=0.7,
                     color=(1, 1, 1),
                     h_align='center'
@@ -2677,14 +3237,13 @@ class ChatLog:
                 tw(
                     parent=s.container,
                     text=f"🏆 {top_user[0][:10]}:{top_user[1]}",
-                    position=(190, y_pos),
+                    position=(165, y_pos),
                     scale=0.5,
                     color=(1, 1, 0),
                     h_align='center'
                 )
             
             cw(s.container, size=(380, 200))
-            tw(s.status_text, text='📊 آمار 500 پیام')
             
         except Exception as e:
             AR.err(f'خطا: {str(e)}')
@@ -2701,39 +3260,43 @@ class ChatLog:
      
 class FontMaker:
     def __init__(s, source):
-        # پنجره با ارتفاع کمتر و هماهنگ با بقیه
+        # Window with smaller height
         w = s.w = AR.cw(
             source=source,
-            size=(500, 350),  # ارتفاع کمتر
+            size=(500, 350),
             ps=AR.UIS() * 0.6
         )
         AR.add_close_button(w, position=(470, 300))
 
-        # عنوان هماهنگ با بقیه
-        tw(parent=w, text="🎨 فونت‌ساز", position=(200, 300), scale=1.0, color=(1,1,0))
+        # Title
+        tw(parent=w, text=u"\ue000 Font Maker", position=(170, 300), scale=1.0, color=(1,1,0))
+        
+        bw(parent=w, size=(40, 40), position=(100, 200), label='', texture=gt('storeIcon'), color=(1, 1, 1))
+        
+        bw(parent=w, size=(40, 40), position=(350, 200), label='', texture=gt('storeIcon'), color=(1, 1, 1))
 
-        # تکست‌باکس ورودی هماهنگ
+        # Input textbox
         tw(parent=w, text="Text:", position=(20, 265), scale=0.8, color=(1,1,1))
         s.input_widget = tw(parent=w, position=(80, 255), size=(390, 40),
-                            editable=True, text="متن خود را وارد کنید", 
+                            editable=True, text="Enter your text", 
                             color=(0.9,0.9,0.9), description="")
 
-        # دکمه ساخت هماهنگ
-        AR.bw(parent=w, label="ساخت فونت‌ها", size=(120, 30),
+        # Generate fonts button
+        AR.bw(parent=w, label="Generate Fonts", size=(120, 30),
               position=(190, 200), on_activate_call=s.show_fonts)
 
-        # اسکرول لیست فونت‌ها با ارتفاع کمتر
+        # Scroll for font list
         s.scroll = sw(parent=w, size=(460, 150), position=(20, 50))
         s.container = cw(parent=s.scroll, size=(440, 1000), background=False)
 
-        # ویجت وضعیت هماهنگ
-        s.status_text = tw(parent=w, text="آماده", 
+        # Status widget
+        s.status_text = tw(parent=w, text="Ready", 
                           position=(230, 25), scale=0.6, color=(0.8,0.8,1))
 
-        # نمایش پیام اولیه
+        # Initial message
         tw(
             parent=s.container,
-            text="⚠️ هنوز فونتی ساخته نشده",
+            text="⚠️ No fonts generated yet",
             position=(220, 70),
             scale=0.7,
             color=(1, 0.5, 0),
@@ -2744,31 +3307,31 @@ class FontMaker:
 
     def show_fonts(s):
         text = tw(query=s.input_widget).strip()
-        if not text or text == "متن خود را وارد کنید":
-            AR.err("لطفاً یک متن وارد کنید!")
+        if not text or text == "Enter your text":
+            AR.err("Please enter some text!")
             return
 
         fonts = generate_fonts(text)
 
-        # پاکسازی قبلی
+        # Clear previous
         for child in s.container.get_children():
             child.delete()
 
-        # نمایش فونت‌ها با قابلیت اسکرول
+        # Display fonts in scrollable list
         y_pos = len(fonts) * 40 - 20
         total_height = 0
         
         for name, styled in fonts.items():
-            # نام فونت - متن کوچکتر
+            # Font name - smaller text
             tw(parent=s.container, text=f"{name}:  ", position=(10, y_pos),
                color=(1,1,1), scale=0.6, maxwidth=90)
             
-            # متن استایل شده - متن کوچکتر
+            # Styled text - smaller
             tw(parent=s.container, text=styled, position=(100, y_pos),
                color=(0,1,0), scale=0.65, maxwidth=250)
             
-            # دکمه کپی هماهنگ
-            AR.bw(parent=s.container, label="کپی", size=(50, 20),
+            # Copy button
+            AR.bw(parent=s.container, label="Copy", size=(50, 20),
                   position=(360, y_pos - 3),
                   on_activate_call=Call(s.copy_font, styled, name),
                   text_scale=0.5)
@@ -2776,77 +3339,118 @@ class FontMaker:
             y_pos -= 40
             total_height += 40
 
-        # تنظیم اندازه کانتینر برای اسکرول صحیح
+        # Adjust container size for proper scrolling
         cw(s.container, size=(440, max(300, total_height)))
         
-        # بروزرسانی وضعیت
-        tw(s.status_text, text=f"{len(fonts)} فونت ساخته شد")
+        # Update status
+        tw(s.status_text, text=f"{len(fonts)} fonts generated")
 
     def copy_font(s, text, font_name):
         try:
             from babase import clipboard_set_text
             clipboard_set_text(text)
-            push(f'فونت {font_name} کپی شد', color=(0,1,0))
+            push(f'Font {font_name} copied', color=(0,1,0))
             gs('dingSmall').play()
         except:
-            AR.err("کلیپ‌بورد پشتیبانی نمی‌شود!")
+            AR.err("Clipboard not supported!")
             
 """اطلاعات بازیکنان - عرض بزرگتر، ارتفاع کمتر"""
+"""اطلاعات بازیکنان - با ذخیره HTML شامل چت‌ها"""
 class PlayerInfo:
     def __init__(s, source):
-        # ویندوز با عرض 600 و ارتفاع 320
+        # ویندوز با ارتفاع کمتر
         w = s.w = AR.cw(
             source=source,
-            size=(600, 320),
+            size=(650, 380),  # ارتفاع کاهش یافته
             ps=AR.UIS()*0.7
         )
         # دکمه بستن
-        AR.add_close_button(w, position=(570, 285))
+        AR.add_close_button(w, position=(620, 300))
 
         # عنوان
         tw(
             parent=w,
-            text='👥 اطلاعات بازیکنان',
-            scale=1.1,
-            position=(280, 270),  # مرکز پنجره جدید
+            text=u'\ue025 Player Manager',
+            scale=1.0,
+            position=(325, 310),
             h_align='center',
             color=(0, 1, 1)
+        )
+        
+        bw(
+            parent=w,
+            size=(70, 70),
+            position=(450, 235),
+            label='',
+            texture=gt('cursor'),
+            color=(1, 1, 1)
         )
 
         # دریافت لیست بازیکنان
         s.players = s.get_players()
+        s.filtered_players = s.players.copy()
+        s.search_text = ''
+        s.current_tab = 'all'
 
-        # اسکرول با عرض بیشتر
+        # بخش جستجو
+        tw(parent=w, text='🔍 Search:', position=(10, 280), scale=0.7, color=(1,1,1))
+        s.search_input = tw(parent=w, position=(110, 280), size=(200, 25), 
+                           editable=True, text='', color=(0.9,0.9,0.9),
+                           description="Search players...",
+                           on_return_press_call=s.apply_search)
+
+        bw(parent=w, label='Search', size=(60, 25), position=(320, 280), 
+           on_activate_call=s.apply_search, color=(0.3,0.6,0.8))
+
+        # تب‌های مدیریت
+        tabs = [
+            ('🌐 All Players', 'all', (20, 250)),
+            ('⭐ Friends', 'friends', (150, 250)),
+            ('🚫 Blocked', 'blocked', (280, 250))
+        ]
+
+        for label, tab_type, pos in tabs:
+            color = (0.4,0.7,0.4) if tab_type == 'all' else (0.4,0.5,0.7)
+            bw(parent=w, label=label, size=(120, 25), position=pos,
+               on_activate_call=Call(s.set_tab, tab_type), color=color,
+               textcolor=(1,1,1), text_scale=0.6)
+
+        # آمار
+        s.stats_widget = tw(parent=w, text='', position=(500, 320), scale=0.5, 
+                           color=(0.8,1,0.8), maxwidth=140, h_align='center')
+        s.update_stats()
+
+        # اسکرول
         s.scroll = sw(
             parent=w,
-            size=(560, 200),
-            position=(20, 50)
+            size=(610, 150),  # ارتفاع کاهش یافته
+            position=(20, 90)
         )
 
         s.container = cw(
             parent=s.scroll,
-            size=(560, len(s.players) * 45),
+            size=(610, len(s.filtered_players) * 35),
             background=False
         )
 
         # دکمه‌های مدیریت
-        buttons = [
-            ('🔄 بروزرسانی', s.refresh_players, (30, 20), (120, 30)),
-            ('📋 کپی همه', s.copy_all_info, (250, 20), (120, 30)),
-            ('🚫 اخراج همه', s.kick_all, (450, 20), (120, 30))
+        management_buttons = [
+            ('📋 Export', s.show_export_menu, (20, 55), (100, 30)),
+            ('🔄 Refresh', s.refresh_players, (140, 55), (100, 30)),
+            ('💬 Save Chat', s.save_chat_html, (260, 55), (120, 30)),
+            ('🚫 Kick All', s.kick_all, (400, 55), (100, 30)),
+            ('⚙️ Settings', s.show_settings, (520, 55), (100, 30))
         ]
-        
-        for label, callback, pos, size in buttons:
-            bw(
-                parent=w,
-                label=label,
-                size=size,
-                position=pos,
-                on_activate_call=callback,
-                color=(0.3, 0.5, 0.8),
-                text_scale=0.8,
-                textcolor=(1, 1, 1)
-            )
+
+        for label, callback, pos, size in management_buttons:
+            color = (0.3,0.6,0.8)
+            if 'Kick' in label: color = (0.8,0.3,0.3)
+            if 'Save' in label: color = (0.4,0.7,0.4)
+            if 'Settings' in label: color = (0.6,0.4,0.8)
+            
+            bw(parent=w, label=label, size=size, position=pos,
+               on_activate_call=callback, color=color,
+               textcolor=(1,1,1), text_scale=0.6)
 
         s.display_players()
         AR.swish()
@@ -2858,203 +3462,768 @@ class PlayerInfo:
             for player in roster:
                 if 'players' in player and player['players']:
                     for p in player['players']:
-                        device_name = player.get('display_string', 'دستگاه ناشناس')
+                        device_name = player.get('display_string', 'Unknown Device')
                         players.append({
-                            'name': p.get('name', 'بازیکن ناشناس'),
-                            'full_name': p.get('name_full', 'بازیکن ناشناس'),
+                            'name': p.get('name', 'Unknown Player'),
                             'client_id': player.get('client_id', -1),
-                            'is_host': player.get('client_id', -1) == -1,
                             'device': device_name
                         })
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error getting players: {e}")
         return players
+
+    def get_friends_list(s):
+        return var('player_friends') or []
+
+    def get_blocked_list(s):
+        return var('player_blocked') or []
+
+    def get_chat_messages(s):
+        """دریافت آخرین چت‌های سرور"""
+        try:
+            chat_messages = GCM()
+            return chat_messages[-50:] if len(chat_messages) > 50 else chat_messages
+        except:
+            return []
+
+    def set_tab(s, tab_type):
+        s.current_tab = tab_type
+        s.filter_players()
+        s.display_players()
+        s.update_stats()
+
+    def apply_search(s):
+        s.search_text = tw(query=s.search_input).strip().lower()
+        s.filter_players()
+        s.display_players()
+        s.update_stats()
+
+    def filter_players(s):
+        if s.current_tab == 'friends':
+            friends = s.get_friends_list()
+            s.filtered_players = [p for p in s.players if p['name'] in friends]
+        elif s.current_tab == 'blocked':
+            blocked = s.get_blocked_list()
+            s.filtered_players = [p for p in s.players if p['name'] in blocked]
+        else:
+            s.filtered_players = s.players.copy()
+        
+        if s.search_text:
+            s.filtered_players = [
+                p for p in s.filtered_players 
+                if s.search_text in p['name'].lower() or 
+                   s.search_text in p['device'].lower()
+            ]
+
+    def update_stats(s):
+        friends_count = len(s.get_friends_list())
+        blocked_count = len(s.get_blocked_list())
+        
+        if not s.filtered_players:
+            stats_text = f'\n0 Players\n               {friends_count} Friends\n               {blocked_count} Blocked'
+        else:
+            stats_text = f'\n{len(s.filtered_players)} Players\n               {friends_count} Friends\n               {blocked_count} Blocked'
+        
+        tw(s.stats_widget, text=stats_text)
 
     def display_players(s):
         for child in s.container.get_children():
             child.delete()
 
-        if not s.players:
-            # نمایش پیام وقتی بازیکنی وجود ندارد
-            tw(
-                parent=s.container,
-                text='⚠️ اطلاعاتی برای دریافت وجود ندارد',
-                position=(100, 90),
-                scale=0.8,
-                color=(1, 0.5, 0),
-                h_align='center'
-            )
+        if not s.filtered_players:
+            message = 'No players found'
+            if s.current_tab == 'friends':
+                message = 'No friends found'
+            elif s.current_tab == 'blocked':
+                message = 'No blocked players'
+            
+            tw(parent=s.container, text=message, position=(305, 75), 
+               scale=0.8, color=(1,0.5,0), h_align='center')
+            cw(s.container, size=(610, 150))
             return
 
-        # هدرهای ستون‌ها با عرض جدید
         headers = [
-            ('نام بازیکن', 30, 0.6, (1, 1, 1)),
-            ('ID', 120, 0.6, (0.8, 0.8, 1)),
-            ('دستگاه', 170, 0.6, (0.6, 1, 0.6)),
-            ('وضعیت', 300, 0.6, (1, 1, 0.8)),
-            ('عملیات', 440, 0.6, (1, 1, 1))
+            ('Player Name', 20, 0.6, (1,1,1)),
+            ('ID', 180, 0.6, (0.8,0.8,1)),
+            ('Device', 240, 0.6, (0.6,1,0.6)),
+            ('Status', 380, 0.6, (1,1,0.8)),
+            ('Actions', 500, 0.6, (1,1,1))
         ]
 
-        y_pos = len(s.players) * 40 + 20
+        y_pos = len(s.filtered_players) * 29 + 15
         for text, x, scale, color in headers:
-            tw(
-                parent=s.container,
-                text=text,
-                position=(x, y_pos),
-                scale=scale,
-                color=color,
-                h_align='center'
-            )
+            tw(parent=s.container, text=text, position=(x, y_pos), 
+               scale=scale, color=color, h_align='center')
 
-        y_pos = len(s.players) * 40 - 15
-        for i, player in enumerate(s.players):
-            bg_color = (0.2, 0.2, 0.3) if i % 2 == 0 else (0.25, 0.25, 0.35)
+        y_pos = len(s.filtered_players) * 30 - 10
+        for i, player in enumerate(s.filtered_players):
+            bg_color = (0.2,0.2,0.3) if i % 2 == 0 else (0.25,0.25,0.35)
             
-            # پس‌زمینه ردیف
-            bw(
-                parent=s.container, 
-                label='', 
-                size=(540, 35),  # عرض بزرگتر مطابق با کانتینر
-                position=(10, y_pos), 
-                color=bg_color, 
-                enable_sound=False
-            )
-
-            # نام بازیکن
-            pname = player['name'][:18] + '...' if len(player['name']) > 18 else player['name']
-            if player['is_host']:
-                pname = f"👑 {pname}"
+            friends = s.get_friends_list()
+            blocked = s.get_blocked_list()
             
-            tw(
-                parent=s.container, 
-                text=pname,
-                position=(20, y_pos + 5), 
-                scale=0.65,
-                color=(1, 1, 1), 
-                maxwidth=160,  # کمی بزرگتر
-                h_align='left'
-            )
+            if player['name'] in friends:
+                bg_color = (0.2,0.4,0.2)
+            elif player['name'] in blocked:
+                bg_color = (0.4,0.2,0.2)
+            
+            bw(parent=s.container, label='', size=(590, 25), 
+               position=(10, y_pos), color=bg_color, enable_sound=False)
 
-            # ID بازیکن
-            tw(
-                parent=s.container, 
-                text=f"{player['client_id']}",
-                position=(120, y_pos + 5), 
-                scale=0.6,
-                color=(0.8, 0.8, 1), 
-                h_align='center'
-            )
+            player_name = player['name']
+            displayed_name = player_name[:15] + '...' if len(player_name) > 15 else player_name
+            
+            if player['name'] in friends:
+                displayed_name = f"⭐ {displayed_name}"
+            elif player['name'] in blocked:
+                displayed_name = f"🚫 {displayed_name}"
+            
+            name_color = (1,1,0.8) if s.search_text and s.search_text in player_name.lower() else (1,1,1)
+            tw(parent=s.container, text=displayed_name, position=(15, y_pos - 1), 
+               scale=0.5, color=name_color, maxwidth=150, h_align='left')
 
-            # نام دستگاه
-            device_text = player['device'][:18] + '...' if len(player['device']) > 18 else player['device']
-            tw(
-                parent=s.container, 
-                text=device_text,
-                position=(160, y_pos + 5), 
-                scale=0.55,
-                color=(0.6, 1, 0.6), 
-                maxwidth=140, 
-                h_align='left'
-            )
+            tw(parent=s.container, text=f"{player['client_id']}", position=(180, y_pos - 1), 
+               scale=0.5, color=(0.8,0.8,1), h_align='center')
 
-            # وضعیت میزبان
-            status_text = "میزبان" if player['is_host'] else "بازیکن"
-            status_color = (1, 1, 0) if player['is_host'] else (0.8, 0.8, 1)
-            tw(
-                parent=s.container, 
-                text=status_text,
-                position=(300, y_pos + 5), 
-                scale=0.6,
-                color=status_color, 
-                h_align='center'
-            )
+            device_text = player['device'][:20] + '...' if len(player['device']) > 20 else player['device']
+            tw(parent=s.container, text=device_text, position=(230, y_pos - 1), 
+               scale=0.5, color=(0.6,1,0.6), maxwidth=130, h_align='left')
 
-            # اکشن‌ها
-            actions = [
-                ('📋', s.copy_player_info, (400, y_pos + 5), player),
-                ('@', s.mention_player, (450, y_pos + 5), player),
-                ('🚫', s.kick_player, (500, y_pos + 5), player)
-            ]
+            status_text = ""
+            status_color = (1,1,1)
+            if player['name'] in friends:
+                status_text = "Friend"
+                status_color = (0,1,0)
+            elif player['name'] in blocked:
+                status_text = "Blocked"
+                status_color = (1,0,0)
+            
+            tw(parent=s.container, text=status_text, position=(380, y_pos - 1), 
+               scale=0.5, color=status_color, h_align='center')
+
+            actions = []
+            friends = s.get_friends_list()
+            blocked = s.get_blocked_list()
+            
+            if player['name'] in friends:
+                actions.append(('❌', s.remove_friend, (440, y_pos + 3), player))
+            else:
+                actions.append(('⭐', s.add_friend, (440, y_pos + 3), player))
+            
+            if player['name'] in blocked:
+                actions.append(('✅', s.unblock_player, (480, y_pos + 3), player))
+            else:
+                actions.append(('🚫', s.block_player, (480, y_pos + 3), player))
+            
+            actions.extend([
+                ('📋', s.copy_player_info, (520, y_pos + 3), player),
+                ('@', s.mention_player, (560, y_pos + 3), player)
+            ])
             
             for label, callback, pos, data in actions:
-                bw(
-                    parent=s.container, 
-                    label=label, 
-                    size=(25, 25),
-                    position=pos, 
-                    on_activate_call=Call(callback, data),
-                    color=(0.3, 0.5, 0.8), 
-                    text_scale=0.6
-                )
+                color = (0.3,0.5,0.8)
+                if '🚫' in label: color = (0.8,0.3,0.3)
+                if '❌' in label: color = (0.8,0.3,0.3)
+                if '⭐' in label: color = (1,0.8,0.2)
+                if '✅' in label: color = (0.2,0.8,0.2)
+                if '@' in label: color = (0.4,0.7,0.4)
+                
+                bw(parent=s.container, label=label, size=(20, 20), position=pos, 
+                   on_activate_call=Call(callback, data), color=color, text_scale=0.5)
 
-            y_pos -= 40
+            y_pos -= 30
 
-        cw(s.container, size=(540, len(s.players) * 40 + 40))
+        cw(s.container, size=(610, len(s.filtered_players) * 30 + 30))
 
     def refresh_players(s):
         s.players = s.get_players()
+        s.filter_players()
         s.display_players()
-        push('🔄 لیست بازیکنان بروزرسانی شد', color=(0, 1, 0))
+        s.update_stats()
+        push('Player list refreshed', color=(0,1,0))
         gs('dingSmall').play()
 
+    def show_export_menu(s):
+        if not s.players:
+            AR.err('No players to export!')
+            return
+            
+        win = AR.cw(source=s.w, size=(350, 250))
+        tw(parent=win, text='📤 Export Format', position=(175, 220), h_align='center')
+        
+        formats = [
+            ('📝 Text', s.export_text),
+            ('📊 CSV', s.export_csv),
+            ('📋 JSON', s.export_json),
+            ('📄 HTML', s.export_html),
+            ('📱 All Formats', s.export_all_formats)
+        ]
+        
+        y_pos = 180
+        for label, callback in formats:
+            bw(parent=win, label=label, size=(140, 25), position=(105, y_pos),
+               on_activate_call=callback, color=(0.3,0.6,0.8))
+            y_pos -= 35
+        
+        AR.add_close_button(win, position=(320, 220))
+
+    def save_chat_html(s):
+        """ذخیره HTML با چت‌های سرور"""
+        try:
+            server_name = "Unknown_Server"
+            try:
+                conn_info = get_connection_info()
+                if conn_info and hasattr(conn_info, 'name'):
+                    server_name = conn_info.name
+                elif server_ip != "127.0.0.1":
+                    server_name = f"Server_{server_ip}_{server_port}"
+            except:
+                server_name = "Local_Server"
+            
+            import os
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            self_taha_dir = os.path.join(script_dir, "SelfTaha")
+            
+            if not os.path.exists(self_taha_dir):
+                os.makedirs(self_taha_dir)
+            
+            import re
+            safe_server_name = re.sub(r'[<>:"/\\|?*]', '_', server_name)
+            safe_server_name = safe_server_name.replace(' ', '_')
+            filename = f"{safe_server_name}_{time.strftime('%Y%m%d_%H%M%S')}.html"
+            filepath = os.path.join(self_taha_dir, filename)
+            
+            html_content = s.generate_html_with_chat()
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            push(f"📁 HTML saved: {filename}", color=(0,1,0))
+            gs('dingSmallHigh').play()
+            
+        except Exception as e:
+            print(f"Error saving HTML: {e}")
+            AR.err("Error saving HTML file")
+
+    def generate_html_with_chat(s):
+        """تولید HTML با چت‌های سرور"""
+        server_name = "Unknown Server"
+        try:
+            conn_info = get_connection_info()
+            if conn_info and hasattr(conn_info, 'name'):
+                server_name = conn_info.name
+            elif server_ip != "127.0.0.1":
+                server_name = f"Server {server_ip}:{server_port}"
+        except:
+            server_name = "Local Server"
+        
+        friends = s.get_friends_list()
+        blocked = s.get_blocked_list()
+        chat_messages = s.get_chat_messages()
+        
+        html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Report - {server_name}</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }}
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }}
+        .header {{
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }}
+        .header h1 {{
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }}
+        .server-info {{
+            font-size: 1.1em;
+            opacity: 0.9;
+        }}
+        .info {{
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }}
+        .info-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }}
+        .info-item {{
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }}
+        .info-item h3 {{
+            color: #6c757d;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }}
+        .info-item p {{
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #495057;
+        }}
+        .section {{
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }}
+        .section:last-child {{
+            border-bottom: none;
+        }}
+        .section h2 {{
+            color: #495057;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4facfe;
+        }}
+        .players-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }}
+        .players-table th {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }}
+        .players-table td {{
+            padding: 10px 12px;
+            border-bottom: 1px solid #dee2e6;
+        }}
+        .players-table tr:nth-child(even) {{
+            background: #f8f9fa;
+        }}
+        .chat-container {{
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }}
+        .chat-message {{
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #4facfe;
+        }}
+        .chat-message.system {{
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }}
+        .chat-message.join {{
+            border-left-color: #17a2b8;
+            background: #e3f2fd;
+        }}
+        .chat-message.leave {{
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }}
+        .message-time {{
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }}
+        .message-content {{
+            font-size: 0.95em;
+            line-height: 1.4;
+        }}
+        .status-friend {{
+            color: #28a745;
+            font-weight: bold;
+        }}
+        .status-blocked {{
+            color: #dc3545;
+            font-weight: bold;
+        }}
+        .footer {{
+            background: #343a40;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            font-size: 0.9em;
+        }}
+        @media (max-width: 768px) {{
+            .container {{
+                margin: 10px;
+            }}
+            .header h1 {{
+                font-size: 1.8em;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Complete Server Report</h1>
+            <p class="server-info">Server: {server_name} | {time.strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+        
+        <div class="info">
+            <h2>📊 Session Overview</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <h3>Total Players</h3>
+                    <p>{len(s.players)}</p>
+                </div>
+                <div class="info-item">
+                    <h3>Friends</h3>
+                    <p>{len(friends)}</p>
+                </div>
+                <div class="info-item">
+                    <h3>Blocked</h3>
+                    <p>{len(blocked)}</p>
+                </div>
+                <div class="info-item">
+                    <h3>Chat Messages</h3>
+                    <p>{len(chat_messages)}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>👥 Player List</h2>
+            <table class="players-table">
+                <thead>
+                    <tr>
+                        <th>Player Name</th>
+                        <th>ID</th>
+                        <th>Device</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+"""
+        
+        for player in s.players:
+            status_class = ""
+            status_text = "Normal"
+            
+            if player['name'] in friends:
+                status_class = "status-friend"
+                status_text = "Friend ⭐"
+            elif player['name'] in blocked:
+                status_class = "status-blocked"
+                status_text = "Blocked 🚫"
+            
+            html_content += f'                    <tr>\n'
+            html_content += f'                        <td>{player["name"]}</td>\n'
+            html_content += f'                        <td>{player["client_id"]}</td>\n'
+            html_content += f'                        <td>{player["device"]}</td>\n'
+            html_content += f'                        <td class="{status_class}">{status_text}</td>\n'
+            html_content += f'                    </tr>\n'
+        
+        html_content += """                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>💬 Chat History (Last 50 Messages)</h2>
+            <div class="chat-container">
+"""
+        
+        if chat_messages:
+            for message in chat_messages:
+                message_class = "normal"
+                if any(x in message.lower() for x in ['joined', 'connected', 'وارد شد']):
+                    message_class = "join"
+                elif any(x in message.lower() for x in ['left', 'disconnected', 'ترک کرد']):
+                    message_class = "leave"
+                elif any(x in message.lower() for x in ['system', 'سیستم']):
+                    message_class = "system"
+                
+                html_content += f'                <div class="chat-message {message_class}">\n'
+                html_content += f'                    <div class="message-time">{time.strftime("%H:%M:%S")}</div>\n'
+                html_content += f'                    <div class="message-content">{message}</div>\n'
+                html_content += f'                </div>\n'
+        else:
+            html_content += '                <div class="chat-message">\n'
+            html_content += '                    <div class="message-content">No chat messages available</div>\n'
+            html_content += '                </div>\n'
+        
+        html_content += """            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Generated by SelfTaha Player Manager • {time.strftime('%Y')}</p>
+        </div>
+    </div>
+</body>
+</html>"""
+        
+        return html_content
+
+    def export_html(s):
+        html_content = s.generate_html_with_chat()
+        s.copy_to_clipboard(html_content, "HTML")
+
+    def export_text(s):
+        export_text = "=== Player List Export ===\n\n"
+        export_text += f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        export_text += f"Total Players: {len(s.players)}\n"
+        export_text += f"Friends: {len(s.get_friends_list())}\n"
+        export_text += f"Blocked: {len(s.get_blocked_list())}\n\n"
+        
+        friends = s.get_friends_list()
+        blocked = s.get_blocked_list()
+        
+        for i, player in enumerate(s.players, 1):
+            status = "Normal"
+            if player['name'] in friends:
+                status = "Friend ⭐"
+            elif player['name'] in blocked:
+                status = "Blocked 🚫"
+            
+            export_text += f"{i}. {player['name']}\n"
+            export_text += f"   ID: {player['client_id']}\n"
+            export_text += f"   Device: {player['device']}\n"
+            export_text += f"   Status: {status}\n"
+            export_text += "-" * 40 + "\n"
+        
+        s.copy_to_clipboard(export_text, "Text")
+
+    def export_csv(s):
+        csv_text = "Name,ID,Device,Status\n"
+        friends = s.get_friends_list()
+        blocked = s.get_blocked_list()
+        
+        for player in s.players:
+            status = "Normal"
+            if player['name'] in friends:
+                status = "Friend"
+            elif player['name'] in blocked:
+                status = "Blocked"
+            
+            csv_text += f'"{player["name"]}",{player["client_id"]},'
+            csv_text += f'"{player["device"]}","{status}"\n'
+        
+        s.copy_to_clipboard(csv_text, "CSV")
+
+    def export_json(s):
+        import json
+        friends = s.get_friends_list()
+        blocked = s.get_blocked_list()
+        
+        players_data = []
+        for player in s.players:
+            status = "normal"
+            if player['name'] in friends:
+                status = "friend"
+            elif player['name'] in blocked:
+                status = "blocked"
+            
+            players_data.append({
+                'name': player['name'],
+                'id': player['client_id'],
+                'device': player['device'],
+                'status': status
+            })
+        
+        json_text = json.dumps(players_data, indent=2, ensure_ascii=False)
+        s.copy_to_clipboard(json_text, "JSON")
+
+    def export_all_formats(s):
+        s.export_text()
+        teck(0.5, s.export_csv)
+        teck(1.0, s.export_json)
+        teck(1.5, s.export_html)
+        push("All formats exported!", color=(0,1,1))
+
+    def copy_to_clipboard(s, text, format_name):
+        if CIS():
+            from babase import clipboard_set_text
+            clipboard_set_text(text)
+            push(f"📋 {format_name} data copied!", color=(0,1,0))
+            gs('dingSmallHigh').play()
+        else:
+            AR.err('Clipboard not supported!')
+
+    def add_friend(s, player):
+        friends = s.get_friends_list()
+        blocked = s.get_blocked_list()
+        
+        if player['name'] in friends:
+            push(f"{player['name']} is already a friend", color=(1,0.8,0.2))
+            return
+            
+        if player['name'] in blocked:
+            push(f"Cannot add blocked player {player['name']} to friends", color=(1,0.5,0))
+            return
+            
+        friends.append(player['name'])
+        var('player_friends', friends)
+        push(f"⭐ {player['name']} added to friends!", color=(0,1,0))
+        gs('dingSmallHigh').play()
+        s.refresh_players()
+
+    def remove_friend(s, player):
+        friends = s.get_friends_list()
+        if player['name'] in friends:
+            friends.remove(player['name'])
+            var('player_friends', friends)
+            push(f"❌ {player['name']} removed from friends", color=(1,0.5,0))
+            gs('dingSmallLow').play()
+            s.refresh_players()
+
+    def block_player(s, player):
+        blocked = s.get_blocked_list()
+        friends = s.get_friends_list()
+        
+        if player['name'] in blocked:
+            push(f"{player['name']} is already blocked", color=(1,0.5,0))
+            return
+            
+        if player['name'] in friends:
+            friends.remove(player['name'])
+            var('player_friends', friends)
+        
+        blocked.append(player['name'])
+        var('player_blocked', blocked)
+        push(f"🚫 {player['name']} blocked!", color=(1,0,0))
+        gs('dingSmallLow').play()
+        s.refresh_players()
+
+    def unblock_player(s, player):
+        blocked = s.get_blocked_list()
+        if player['name'] in blocked:
+            blocked.remove(player['name'])
+            var('player_blocked', blocked)
+            push(f"✅ {player['name']} unblocked!", color=(0,1,0))
+            gs('dingSmallHigh').play()
+            s.refresh_players()
+
+    def show_settings(s):
+        win = AR.cw(source=s.w, size=(300, 200))
+        tw(parent=win, text='⚙️ List Management', position=(125, 170), h_align='center')
+        
+        settings = [
+            ('🗑️ Clear Friends', s.clear_friends),
+            ('🗑️ Clear Blocked', s.clear_blocked),
+            ('📝 Export Lists', s.export_lists)
+        ]
+        
+        y_pos = 130
+        for label, callback in settings:
+            bw(parent=win, label=label, size=(140, 25), position=(80, y_pos),
+               on_activate_call=callback, color=(0.3,0.6,0.8))
+            y_pos -= 35
+        
+        AR.add_close_button(win, position=(270, 170))
+
+    def clear_friends(s):
+        var('player_friends', [])
+        push("Friends list cleared!", color=(1,0.5,0))
+        s.refresh_players()
+
+    def clear_blocked(s):
+        var('player_blocked', [])
+        push("Blocked list cleared!", color=(1,0.5,0))
+        s.refresh_players()
+
+    def export_lists(s):
+        friends = s.get_friends_list()
+        blocked = s.get_blocked_list()
+        
+        export_text = "=== Player Lists Export ===\n\n"
+        export_text += f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        
+        export_text += "⭐ Friends List:\n"
+        if friends:
+            for i, friend in enumerate(friends, 1):
+                export_text += f"{i}. {friend}\n"
+        else:
+            export_text += "No friends\n"
+        
+        export_text += "\n🚫 Blocked List:\n"
+        if blocked:
+            for i, blocked_player in enumerate(blocked, 1):
+                export_text += f"{i}. {blocked_player}\n"
+        else:
+            export_text += "No blocked players\n"
+        
+        s.copy_to_clipboard(export_text, "Lists")
+
+    def mention_all(s):
+        if not s.players:
+            AR.err('No players to mention!')
+            return
+            
+        try:
+            for player in s.players:
+                message = f"@{player['name']}"
+                CM(message)
+                time.sleep(0.3)
+            push("All players mentioned!", color=(0,1,1))
+            gs('dingSmall').play()
+        except Exception:
+            AR.err("Error sending mentions")
+
     def copy_player_info(s, player):
-        info = (f"نام بازیکن: {player['name']}\n"
-                f"شناسه: {player['client_id']}\n"
-                f"دستگاه: {player['device']}\n"
-                f"وضعیت: {'میزبان' if player['is_host'] else 'بازیکن'}")
+        info = (f"Player Name: {player['name']}\n"
+                f"ID: {player['client_id']}\n"
+                f"Device: {player['device']}")
         
         if CIS():
             from babase import clipboard_set_text
             clipboard_set_text(info)
-            push(f'📋 اطلاعات {player["name"]} کپی شد', color=(0, 1, 0))
+            push(f"Info of {player['name']} copied", color=(0,1,0))
             gs('dingSmall').play()
         else:
-            AR.err('❌ کلیپ‌بورد پشتیبانی نمی‌شود!')
-
-    def copy_all_info(s):
-        if not s.players:
-            AR.err('❌ بازیکنی برای کپی وجود ندارد!')
-            return
-            
-        all_info = "👥 لیست بازیکنان:\n\n"
-        for player in s.players:
-            status = "👑 میزبان" if player['is_host'] else "👤 بازیکن"
-            all_info += f"• {player['name']} (ID: {player['client_id']}) - {player['device']} - {status}\n"
-        
-        if CIS():
-            from babase import clipboard_set_text
-            clipboard_set_text(all_info)
-            push('📋 اطلاعات همه بازیکنان کپی شد', color=(0, 1, 0))
-            gs('dingSmallHigh').play()
-        else:
-            AR.err('❌ کلیپ‌بورد پشتیبانی نمی‌شود!')
+            AR.err('Clipboard not supported!')
 
     def mention_player(s, player):
         try:
             message = f"@{player['name']}"
             CM(message)
-            push(f"📍 {player['name']} منشن شد", color=(0, 1, 1))
+            push(f"{player['name']} mentioned", color=(0,1,1))
             gs('dingSmall').play()
         except Exception:
-            AR.err(f"❌ خطا در ارسال منشن")
+            AR.err(f"Error sending mention")
 
     def kick_player(s, player):
-        if player['is_host']:
-            AR.err('❌ نمی‌توان میزبان را اخراج کرد!')
-            return
-        
         try:
             from bascenev1 import disconnect_client
             disconnect_client(player['client_id'])
-            push(f"🚫 {player['name']} اخراج شد", color=(1, 0.5, 0))
+            push(f"{player['name']} kicked", color=(1,0.5,0))
             gs('dingSmallLow').play()
             teck(1.0, s.refresh_players)
         except Exception:
-            AR.err(f"❌ خطا در اخراج")
+            AR.err(f"Error kicking player")
 
     def kick_all(s):
         if not s.players:
-            AR.err('❌ بازیکنی برای اخراج وجود ندارد!')
+            AR.err('No players to kick!')
             return
             
         try:
@@ -3062,22 +4231,21 @@ class PlayerInfo:
             kicked_count = 0
             
             for player in s.players:
-                if not player['is_host']:
-                    try:
-                        disconnect_client(player['client_id'])
-                        kicked_count += 1
-                    except:
-                        continue
+                try:
+                    disconnect_client(player['client_id'])
+                    kicked_count += 1
+                except:
+                    continue
             
             if kicked_count > 0:
-                push(f"🚫 {kicked_count} بازیکن اخراج شدند", color=(1, 0.5, 0))
+                push(f"{kicked_count} players kicked", color=(1,0.5,0))
                 gs('dingSmallLow').play()
                 teck(1.0, s.refresh_players)
             else:
-                AR.err('❌ هیچ بازیکنی برای اخراج وجود ندارد!')
+                AR.err('No players to kick!')
                 
         except Exception:
-            AR.err(f"❌ خطا در اخراج گروهی")
+            AR.err(f"Error during kick")
             
             
 """تغییر رنگ UI"""
@@ -3619,18 +4787,13 @@ class CustomTransactions:
 
 
 def launch_colorscheme_selection_window():
-    # We store whether the player is a pro account or not since we
-    # temporarily attempt to bypass the limitation where only pro
-    # accounts can set custom RGB color values, and we restore this
-    # value back later on.
-
-    # Also, we attempt to store this value here (and not in the
-    # beginning) since the player might be using other dedicated
-    # pro-unlocker plugins which may attempt to override the game
-    # method early on in the beginning, therefore, leading us to a
-    # race-condition and we may not correctly store whether the player
-    # has pro-unlocked or not if our plugin runs before the dedicated
-    # pro-unlocker plugin has been applied.
+    # Store whether the player has a pro account or not
+    # temporarily bypassing the restriction that only pro
+    # accounts can set custom RGB colors, then restore later.
+    #
+    # We store it here instead of at startup because other
+    # pro-unlocker plugins might override the game method early,
+    # causing a race condition and potentially storing the wrong value.
     global original_have_pro
     original_have_pro = bui.app.classic.accounts.have_pro
 
@@ -3649,71 +4812,71 @@ def load_colorscheme():
 
 
 def load_plugin():
-    # Allow access to changing colorschemes manually through the in-game
-    # console.
+    # Allow manual colorscheme changes through the in-game console.
     _babase.ColorScheme = ColorScheme
-    # Adds a new advanced code entry named "colorscheme" which can be
-    # entered through Settings -> Advanced -> Enter Code, allowing
-    # colorscheme modification through a friendly UI.
+    # Add a new advanced code entry named "colorscheme" via
+    # Settings -> Advanced -> Enter Code, enabling UI-based colorscheme changes.
     custom_transactions = CustomTransactions()
     custom_transactions.add("colorscheme", colorscheme_transaction)
     custom_transactions.enable()
     # Load any previously saved colorscheme.
     load_colorscheme()
 
-# بارگذاری پلاگین رنگ‌ها هنگام راه‌اندازی
+
+# Load colors plugin on startup
 load_plugin()
 
-# فلگ متوقف کردن ارسال
+# Flags for sending icons
 _stop_sending_icons = False
-_icon_timers = []  # لیست همه تایمرهای فعال
-_icons_menu_opened = False  # بررسی اینکه منو باز است یا نه
+_icon_timers = []  # List of all active timers
+_icons_menu_opened = False  # Check if menu is open or not
+
 
 def show_icons_menu(source_widget=None):
-    """نمایش منوی نمادها - ویندوز باریک و بلند با کنترل توقف"""
+    """Show icons menu - tall and narrow window with stop control"""
     global _icons_menu_opened
     if _icons_menu_opened:
-        return  # اگر منو باز است، دوباره ایجاد نشود
+        return  # Don't recreate if menu is already open
     _icons_menu_opened = True
 
     try:
         icons = [
-            ('', ' نماد 1'),
-            ('', ' نماد 2'),
-            ('', ' نماد 3'),
-            ('', ' نماد 4'),
-            ('', ' نماد 5'),
-            ('', ' نماد 6'),
-            ('', ' نماد 7'),
-            ('', ' نماد 8'),
-            ('', ' نماد 9'),
-            ('', ' نماد 10'),
-            ('', ' نماد 11'),
-            ('', ' نماد 12'),
-            ('', ' نماد 13'),
-            ('', ' نماد 14'),
-            ('', ' نماد 15'),
-            ('', ' نماد 16'),
-            ('', ' نماد 17'),
-            ('', ' نماد 18'),
-            ('', ' نماد 19'),
-            ('', ' نماد 20'),
-            ('', ' نماد 21'),
-            ('', ' نماد 22'),
-            ('', ' نماد 23'),
-            ('', ' نماد 24'),
-            ('', ' نماد 25'),
-            ('', ' نماد 26'),
-            ('', ' نماد 27'),
-            ('', ' نماد 28'),
-            ('', ' نماد 29'),
-            ('', ' نماد 30'),
-            ('', ' نماد 31'),
-            ('', ' نماد 32'),
-            ('', ' نماد 33'),
-            ('', ' نماد 34'),
-            ('', ' نماد 35'),
-            ('', ' نماد 36')
+            ('', ' Icon 1'),
+            ('', ' Icon 2'),
+            ('', ' Icon 3'),
+            ('', ' Icon 4'),
+            ('', ' Icon 5'),
+            ('', ' Icon 6'),
+            ('', ' Icon 7'),
+            ('', ' Icon 8'),
+            ('', ' Icon 9'),
+            ('', ' Icon 10'),
+            ('', ' Icon 11'),
+            ('', ' Icon 12'),
+            ('', ' Icon 13'),
+            ('', ' Icon 14'),
+            ('', ' Icon 15'),
+            ('', ' Icon 16'),
+            ('', ' Icon 17'),
+            ('', ' Icon 18'),
+            ('', ' Icon 19'),
+            ('', ' Icon 20'),
+            ('', ' Icon 21'),
+            ('', ' Icon 22'),
+            ('', ' Icon 23'),
+            ('', ' Icon 24'),
+            ('', ' Icon 25'),
+            ('', ' Icon 26'),
+            ('', ' Icon 27'),
+            ('', ' Icon 28'),
+            ('', ' Icon 29'),
+            ('', ' Icon 30'),
+            ('', ' Icon 31'),
+            ('', ' Icon 32'),
+            ('', ' Icon 33'),
+            ('', ' Icon 34'),
+            ('', ' Icon 35'),
+            ('', ' Icon 36')
         ]
 
         w = bui.containerwidget(
@@ -3726,7 +4889,7 @@ def show_icons_menu(source_widget=None):
 
         bui.textwidget(
             parent=w,
-            text='نمادهای بازی',
+            text=u'\ue027 Game Icons',
             position=(400, 660),
             scale=1.3,
             color=(1, 1, 0),
@@ -3751,34 +4914,40 @@ def show_icons_menu(source_widget=None):
                 textcolor=(1, 1, 1)
             )
 
-        # دکمه ارسال همه
+        # Send all button
         bui.buttonwidget(
             parent=w,
             position=(100, 30),
+            icon=gt('logIcon'),
             size=(200, 60),
-            label='ارسال همه (2ثانیه)',
+            iconscale=0.9,
+            label='Send All (2 sec)',
             on_activate_call=lambda: send_all_icons_delayed(icons, 2.0),
             color=(0.2, 0.6, 0.2),
             textcolor=(1, 1, 1)
         )
 
-        # دکمه توقف ارسال
+        # Stop sending button
         bui.buttonwidget(
             parent=w,
             position=(525, 30),
+            icon=gt('achievementsIcon'),
             size=(180, 60),
-            label='⛔ توقف ارسال',
+            iconscale=0.9,
+            label='Stop Sending',
             on_activate_call=stop_sending_icons,
             color=(0.8, 0.3, 0.3),
             textcolor=(1, 1, 1)
         )
 
-        # دکمه بستن
+        # Close button
         bui.buttonwidget(
             parent=w,
             position=(350, 30),
+            icon=gt('crossOut'),
             size=(120, 60),
-            label='بستن',
+            iconscale=0.9,
+            label='Close',
             on_activate_call=lambda: close_icons_menu(w),
             color=(0.6, 0.2, 0.2),
             textcolor=(1, 1, 1)
@@ -3787,484 +4956,973 @@ def show_icons_menu(source_widget=None):
     except Exception as e:
         print(f"Error showing icons menu: {e}")
 
+
 def close_icons_menu(widget):
-    """بستن منوی نمادها"""
+    """Close the icons menu"""
     global _icons_menu_opened
     _icons_menu_opened = False
     bui.containerwidget(edit=widget, transition='out_scale')
 
+
 def send_icon(icon: str):
-    """ارسال نماد به چت"""
+    """Send icon to chat"""
     try:
         bs.chatmessage(icon)
-        bui.screenmessage(f'ارسال شد: {icon}', color=(0, 1, 0))
+        bui.screenmessage(f'Sent: {icon}', color=(0, 1, 0))
         bui.getsound('dingSmall').play()
     except Exception as e:
         print(f"Error sending icon: {e}")
 
+
 def send_all_icons_delayed(icons, delay_seconds=2.0):
-    """ارسال همه نمادها با تأخیر"""
+    """Send all icons with delay"""
     global _stop_sending_icons, _icon_timers
     _stop_sending_icons = False
     _icon_timers = []
 
     try:
-        bui.screenmessage(f'شروع ارسال همه نمادها (هر {delay_seconds} ثانیه)...', color=(0, 1, 1))
+        bui.screenmessage(f'Start sending all icons (every {delay_seconds} sec)...', color=(0, 1, 1))
         for i, (icon, _) in enumerate(icons):
             t = bui.apptimer(i * delay_seconds, lambda ic=icon: send_single_icon_delayed(ic))
             _icon_timers.append(t)
     except Exception as e:
         print(f"Error starting delayed send: {e}")
 
+
 def send_single_icon_delayed(icon: str):
-    """ارسال تک نماد با تأخیر"""
+    """Send single icon with delay"""
     global _stop_sending_icons
     try:
         if _stop_sending_icons:
             return
         bs.chatmessage(icon)
-        bui.screenmessage(f'ارسال شد: {icon}', color=(0, 1, 0))
+        bui.screenmessage(f'Sent: {icon}', color=(0, 1, 0))
     except Exception as e:
         print(f"Error sending delayed icon: {e}")
 
+
 def stop_sending_icons():
-    """توقف کامل ارسال همه نمادها"""
+    """Stop sending all icons completely"""
     global _stop_sending_icons, _icon_timers
     _stop_sending_icons = True
-    # همه تایمرها رو لغو کنیم
+    # Cancel all timers
     for t in _icon_timers:
         try:
             t.cancel()
         except Exception:
             pass
     _icon_timers = []
-    bui.screenmessage('⛔ ارسال همه نمادها متوقف شد', color=(1, 0, 0))
+    bui.screenmessage('⛔ Sending of all icons stopped', color=(1, 0, 0))
     
 # اضافه کردن کلاس ماشین حساب بعد از کلاس PlayerInfo
 # اضافه کردن کلاس ماشین حساب بعد از کلاس PlayerInfo
 class Calculator:
     def __init__(s, source):
-        # ویندوز با ارتفاع 330 (کاهش یافته)
+        # Window with reduced height
         w = s.w = AR.cw(
             source=source,
-            size=(400, 330),  # ارتفاع 330
+            size=(400, 330),
             ps=AR.UIS()*0.7
         )
-        # افزودن دکمه بستن
         AR.add_close_button(w, position=(370, 290))
         
-        # عنوان
-        tw(
-            parent=w,
-            text='🧮 ماشین حساب',
-            scale=1.0,
-            position=(180, 295),
-            h_align='center',
-            color=(0, 1, 1)
-        )
+        # Title
+        tw(parent=w, text='🧮 Calculator', scale=1.0, position=(180, 295), h_align='center', color=(0, 1, 1))
         
-        # نمایشگر نتیجه
-        s.display = tw(
-            parent=w,
-            text='0',
-            position=(175, 260),
-            scale=1.2,
-            h_align='center',
-            color=(1, 1, 1),
-            maxwidth=350
-        )
+        # Display
+        s.display = tw(parent=w, text='0', position=(175, 260), scale=1.2, h_align='center', color=(1,1,1), maxwidth=350)
         
-        # متغیرهای محاسبات
+        # Calculation variables
         s.current_input = '0'
         s.previous_input = ''
         s.operation = None
         s.reset_next_input = False
-        s.display_formatted = True  # حالت نمایش با ویرگول
+        s.display_formatted = True
         
-        # دکمه‌های مدیریت جدید (کپی و ارسال)
+        # Action buttons (copy/send)
         action_buttons = [
-            ('📋 کپی', s.copy_result, (20, 230), (170, 30), (0.3, 0.6, 0.8)),
-            ('💬 ارسال', s.send_to_chat, (210, 230), (170, 30), (0.3, 0.8, 0.6))
+            ('📋 Copy', s.copy_result, (20, 230), (170, 30), (0.3, 0.6, 0.8)),
+            ('💬 Send', s.send_to_chat, (210, 230), (170, 30), (0.3, 0.8, 0.6))
         ]
-        
         for label, callback, pos, size, color in action_buttons:
-            bw(
-                parent=w,
-                label=label,
-                size=size,
-                position=pos,
-                on_activate_call=callback,
-                color=color,
-                textcolor=(1, 1, 1),
-                text_scale=0.7
-            )
+            bw(parent=w, label=label, size=size, position=pos, on_activate_call=callback, color=color, textcolor=(1,1,1), text_scale=0.7)
         
-        # دکمه‌های اصلی ماشین حساب
+        # Main calculator buttons
         buttons = [
-            # ردیف 1
-            ('C', s.clear_all, (20, 180), (55, 30), (1, 0.5, 0.5)),
-            ('±', s.toggle_sign, (85, 180), (55, 30), (0.5, 0.7, 1)),
-            ('%', s.percentage, (150, 180), (55, 30), (0.5, 0.7, 1)),
-            ('x²', s.square, (215, 180), (55, 30), (0.5, 0.7, 1)),
-            ('√', s.square_root, (280, 180), (55, 30), (0.5, 0.7, 1)),
-            ('xʸ', s.power, (345, 180), (55, 30), (0.5, 0.7, 1)),
-            
-            # ردیف 2
-            ('7', lambda: s.append_number('7'), (20, 140), (55, 30), (0.4, 0.4, 0.6)),
-            ('8', lambda: s.append_number('8'), (85, 140), (55, 30), (0.4, 0.4, 0.6)),
-            ('9', lambda: s.append_number('9'), (150, 140), (55, 30), (0.4, 0.4, 0.6)),
-            ('÷', lambda: s.set_operation('/'), (215, 140), (55, 30), (1, 0.8, 0.3)),
-            ('⌫', s.backspace, (280, 140), (55, 30), (0.8, 0.3, 0.3)),
-            (',', s.toggle_format, (345, 140), (55, 30), (0.7, 0.5, 0.8)),
-            
-            # ردیف 3
-            ('4', lambda: s.append_number('4'), (20, 100), (55, 30), (0.4, 0.4, 0.6)),
-            ('5', lambda: s.append_number('5'), (85, 100), (55, 30), (0.4, 0.4, 0.6)),
-            ('6', lambda: s.append_number('6'), (150, 100), (55, 30), (0.4, 0.4, 0.6)),
-            ('×', lambda: s.set_operation('*'), (215, 100), (55, 30), (1, 0.8, 0.3)),
-            ('1/x', s.reciprocal, (280, 100), (55, 30), (0.5, 0.7, 1)),
-            ('±', s.toggle_format_display, (345, 100), (55, 30), (0.7, 0.5, 0.8)),
-            
-            # ردیف 4
-            ('1', lambda: s.append_number('1'), (20, 60), (55, 30), (0.4, 0.4, 0.6)),
-            ('2', lambda: s.append_number('2'), (85, 60), (55, 30), (0.4, 0.4, 0.6)),
-            ('3', lambda: s.append_number('3'), (150, 60), (55, 30), (0.4, 0.4, 0.6)),
-            ('-', lambda: s.set_operation('-'), (215, 60), (55, 30), (1, 0.8, 0.3)),
-            ('n!', s.factorial, (280, 60), (55, 30), (0.5, 0.7, 1)),
-            ('log', s.logarithm, (345, 60), (55, 30), (0.5, 0.7, 1)),
-            
-            # ردیف 5
-            ('0', lambda: s.append_number('0'), (20, 20), (120, 30), (0.4, 0.4, 0.6)),
-            ('.', s.add_decimal, (150, 20), (55, 30), (0.4, 0.4, 0.6)),
-            ('=', s.calculate, (215, 20), (55, 30), (0.2, 0.8, 0.2)),
-            ('+', lambda: s.set_operation('+'), (280, 20), (120, 30), (1, 0.8, 0.3)),
+            # Row 1
+            ('C', s.clear_all, (20, 180), (55,30), (1,0.5,0.5)),
+            ('±', s.toggle_sign, (85,180), (55,30), (0.5,0.7,1)),
+            ('%', s.percentage, (150,180), (55,30), (0.5,0.7,1)),
+            ('x²', s.square, (215,180), (55,30), (0.5,0.7,1)),
+            ('√', s.square_root, (280,180), (55,30), (0.5,0.7,1)),
+            ('xʸ', s.power, (345,180), (55,30), (0.5,0.7,1)),
+            # Row 2
+            ('7', lambda: s.append_number('7'), (20,140), (55,30), (0.4,0.4,0.6)),
+            ('8', lambda: s.append_number('8'), (85,140), (55,30), (0.4,0.4,0.6)),
+            ('9', lambda: s.append_number('9'), (150,140), (55,30), (0.4,0.4,0.6)),
+            ('÷', lambda: s.set_operation('/'), (215,140), (55,30), (1,0.8,0.3)),
+            ('⌫', s.backspace, (280,140), (55,30), (0.8,0.3,0.3)),
+            (',', s.toggle_format, (345,140), (55,30), (0.7,0.5,0.8)),
+            # Row 3
+            ('4', lambda: s.append_number('4'), (20,100), (55,30), (0.4,0.4,0.6)),
+            ('5', lambda: s.append_number('5'), (85,100), (55,30), (0.4,0.4,0.6)),
+            ('6', lambda: s.append_number('6'), (150,100), (55,30), (0.4,0.4,0.6)),
+            ('×', lambda: s.set_operation('*'), (215,100), (55,30), (1,0.8,0.3)),
+            ('1/x', s.reciprocal, (280,100), (55,30), (0.5,0.7,1)),
+            ('±', s.toggle_format_display, (345,100), (55,30), (0.7,0.5,0.8)),
+            # Row 4
+            ('1', lambda: s.append_number('1'), (20,60), (55,30), (0.4,0.4,0.6)),
+            ('2', lambda: s.append_number('2'), (85,60), (55,30), (0.4,0.4,0.6)),
+            ('3', lambda: s.append_number('3'), (150,60), (55,30), (0.4,0.4,0.6)),
+            ('-', lambda: s.set_operation('-'), (215,60), (55,30), (1,0.8,0.3)),
+            ('n!', s.factorial, (280,60), (55,30), (0.5,0.7,1)),
+            ('log', s.logarithm, (345,60), (55,30), (0.5,0.7,1)),
+            # Row 5
+            ('0', lambda: s.append_number('0'), (20,20), (120,30), (0.4,0.4,0.6)),
+            ('.', s.add_decimal, (150,20), (55,30), (0.4,0.4,0.6)),
+            ('=', s.calculate, (215,20), (55,30), (0.2,0.8,0.2)),
+            ('+', lambda: s.set_operation('+'), (280,20), (120,30), (1,0.8,0.3)),
         ]
-        
         for label, callback, pos, size, color in buttons:
-            bw(
-                parent=w,
-                label=label,
-                size=size,
-                position=pos,
-                on_activate_call=callback,
-                color=color,
-                textcolor=(1, 1, 1),
-                text_scale=0.8
-            )
+            bw(parent=w, label=label, size=size, position=pos, on_activate_call=callback, color=color, textcolor=(1,1,1), text_scale=0.8)
         
         AR.swish()
     
+    # Number formatting with commas
     def format_number(s, number_str):
         try:
-            # تبدیل به عدد
             num = float(number_str)
-            
-            # اگر عدد صحیح است
             if num.is_integer():
                 num_int = int(num)
-                # فرمت با ویرگول برای اعداد بزرگ
-                if abs(num_int) >= 1000:
-                    return f"{num_int:,}"
-                else:
-                    return str(num_int)
-            
-            # اگر عدد اعشاری است
+                return f"{num_int:,}" if abs(num_int)>=1000 else str(num_int)
             else:
-                # بررسی اگر اعشار صفر است (مثل 5.0)
-                if num == int(num):
-                    num_int = int(num)
-                    if abs(num_int) >= 1000:
-                        return f"{num_int:,}"
-                    else:
-                        return str(num_int)
-                
-                # برای اعداد اعشاری واقعی
                 parts = str(num).split('.')
                 int_part = int(parts[0]) if parts[0] else 0
-                
-                # فرمت قسمت صحیح با ویرگول
                 formatted_int = f"{int_part:,}"
-                
-                # اضافه کردن قسمت اعشاری (حداکثر 6 رقم)
                 decimal_part = parts[1][:6].rstrip('0')
-                if decimal_part:
-                    return formatted_int + '.' + decimal_part
-                else:
-                    return formatted_int
-                    
+                return formatted_int + '.' + decimal_part if decimal_part else formatted_int
         except:
             return number_str
     
+    # Remove commas
     def parse_number(s, formatted_str):
-        # حذف ویرگول‌ها برای محاسبات
         return formatted_str.replace(',', '')
     
+    # Display text with/without commas
     def get_display_text(s):
-        """متن نمایش داده شده را برمی‌گرداند (با ویرگول)"""
-        if s.display_formatted:
-            return s.format_number(s.current_input)
-        else:
-            return s.current_input
-    
+        return s.format_number(s.current_input) if s.display_formatted else s.current_input
     def get_raw_text(s):
-        """متن خام را برمی‌گرداند (بدون ویرگول برای محاسبات)"""
         return s.parse_number(s.current_input) if s.display_formatted else s.current_input
-    
     def update_display(s):
         if s.display.exists():
-            display_text = s.get_display_text()
-            tw(s.display, text=display_text)
-    
+            tw(s.display, text=s.get_display_text())
     def toggle_format(s):
         s.display_formatted = not s.display_formatted
         s.update_display()
         gs('click01').play()
-    
     def toggle_format_display(s):
-        status = "با ویرگول" if s.display_formatted else "بدون ویرگول"
-        push(f"حالت نمایش: {status}", color=(0, 1, 1))
+        status = "Formatted" if s.display_formatted else "Raw"
+        push(f"Display mode: {status}", color=(0,1,1))
         gs('dingSmall').play()
     
+    # Input methods
     def append_number(s, number):
-        if s.reset_next_input:
-            s.current_input = '0'
-            s.reset_next_input = False
+        if s.reset_next_input: s.current_input='0'; s.reset_next_input=False
         current = s.get_raw_text()
-        if current == '0':
-            current = number
-        else:
-            current += number
-        s.current_input = current
-        s.update_display()
-        gs('click01').play()
-    
+        s.current_input = number if current=='0' else current+number
+        s.update_display(); gs('click01').play()
     def add_decimal(s):
-        if s.reset_next_input:
-            s.current_input = '0'
-            s.reset_next_input = False
+        if s.reset_next_input: s.current_input='0'; s.reset_next_input=False
         current = s.get_raw_text()
-        if '.' not in current:
-            current += '.'
-            s.current_input = current
-            s.update_display()
-            gs('click01').play()
-    
+        if '.' not in current: s.current_input=current+'.'; s.update_display(); gs('click01').play()
     def backspace(s):
         current = s.get_raw_text()
-        if current != '0' and len(current) > 1:
-            current = current[:-1]
-        elif len(current) == 1:
-            current = '0'
-        s.current_input = current
-        s.update_display()
-        gs('swish').play()
+        if current!='0' and len(current)>1: current=current[:-1]
+        else: current='0'
+        s.current_input=current; s.update_display(); gs('swish').play()
     
-    def square(s):
-        try:
-            current = s.get_raw_text()
-            value = float(current)
-            result = value ** 2
-            s.current_input = str(result)
-            s.update_display()
-            gs('dingSmall').play()
-        except:
-            s.current_input = 'خطا'
-            s.update_display()
-            gs('error').play()
-            teck(2.0, s.clear_all)
-    
-    def square_root(s):
-        try:
-            current = s.get_raw_text()
-            value = float(current)
-            if value < 0:
-                raise ValueError("جذر اعداد منفی")
-            result = value ** 0.5
-            s.current_input = str(result)
-            s.update_display()
-            gs('dingSmall').play()
-        except:
-            s.current_input = 'خطا'
-            s.update_display()
-            gs('error').play()
-            teck(2.0, s.clear_all)
-    
-    def power(s):
-        try:
-            if s.operation and not s.reset_next_input:
-                s.calculate()
-            current = s.get_raw_text()
-            s.previous_input = current
-            s.operation = '**'
-            s.reset_next_input = True
-            push("عدد دوم را وارد کنید", color=(0, 1, 1))
-            gs('click01').play()
-        except:
-            s.clear_all()
-    
-    def reciprocal(s):
-        try:
-            current = s.get_raw_text()
-            value = float(current)
-            if value == 0:
-                raise ZeroDivisionError
-            result = 1 / value
-            s.current_input = str(result)
-            s.update_display()
-            gs('dingSmall').play()
-        except:
-            s.current_input = 'خطا'
-            s.update_display()
-            gs('error').play()
-            teck(2.0, s.clear_all)
-    
-    def factorial(s):
-        try:
-            current = s.get_raw_text()
-            n = int(float(current))
-            if n < 0:
-                raise ValueError("فاکتوریل منفی تعریف نشده")
-            import math
-            result = math.factorial(n)
-            s.current_input = str(result)
-            s.update_display()
-            gs('dingSmall').play()
-        except:
-            s.current_input = 'خطا'
-            s.update_display()
-            gs('error').play()
-            teck(2.0, s.clear_all)
-
-    def logarithm(s):
-        try:
-            current = s.get_raw_text()
-            value = float(current)
-            if value <= 0:
-                raise ValueError("لگاریتم تعریف نشده")
-            import math
-            result = math.log10(value)
-            s.current_input = str(result)
-            s.update_display()
-            gs('dingSmall').play()
-        except:
-            s.current_input = 'خطا'
-            s.update_display()
-            gs('error').play()
-            teck(2.0, s.clear_all)
-    
+    # Operations
+    def square(s): s._unary_op(lambda x:x**2)
+    def square_root(s): s._unary_op(lambda x:x**0.5, allow_negative=False)
+    def power(s): s._binary_op('**', "Enter second number")
+    def reciprocal(s): s._unary_op(lambda x:1/x, zero_error=True)
+    def factorial(s): s._unary_op(lambda n:__import__('math').factorial(int(n)), int_only=True)
+    def logarithm(s): s._unary_op(lambda x:__import__('math').log10(x), positive_only=True)
     def toggle_sign(s):
         current = s.get_raw_text()
-        if current != '0':
-            if current.startswith('-'):
-                current = current[1:]
-            else:
-                current = '-' + current
-            s.current_input = current
-            s.update_display()
-            gs('click01').play()
-    
+        if current!='0': s.current_input = current[1:] if current.startswith('-') else '-'+current
+        s.update_display(); gs('click01').play()
     def percentage(s):
-        try:
-            current = s.get_raw_text()
-            value = float(current) / 100
-            s.current_input = str(value)
-            s.update_display()
-            gs('dingSmall').play()
-        except:
-            s.current_input = '0'
-            s.update_display()
+        try: s.current_input=str(float(s.get_raw_text())/100); s.update_display(); gs('dingSmall').play()
+        except: s.current_input='0'; s.update_display()
     
+    # Binary operation
     def set_operation(s, op):
-        try:
-            if s.operation and not s.reset_next_input:
-                s.calculate()
-            current = s.get_raw_text()
-            s.previous_input = current
-            s.operation = op
-            s.reset_next_input = True
-            gs('click01').play()
-        except:
-            s.clear_all()
-    
+        if s.operation and not s.reset_next_input: s.calculate()
+        s.previous_input = s.get_raw_text(); s.operation=op; s.reset_next_input=True; gs('click01').play()
     def calculate(s):
         try:
-            if not s.operation or s.reset_next_input:
-                return
-            
-            num1_str = s.parse_number(s.previous_input) if s.display_formatted else s.previous_input
-            num2_str = s.get_raw_text()
-            
-            num1 = float(num1_str)
-            num2 = float(num2_str)
-            
-            result = 0
-            if s.operation == '+':
-                result = num1 + num2
-            elif s.operation == '-':
-                result = num1 - num2
-            elif s.operation == '*':
-                result = num1 * num2
-            elif s.operation == '/':
-                if num2 == 0:
-                    raise ZeroDivisionError("تقسیم بر صفر")
-                result = num1 / num2
-            elif s.operation == '**':
-                result = num1 ** num2
-            
-            # تبدیل نتیجه به رشته و حذف .0 اضافی برای اعداد صحیح
-            if result.is_integer():
-                s.current_input = str(int(result))
-            else:
-                s.current_input = str(result)
-                
-            s.operation = None
-            s.reset_next_input = True
-            s.update_display()
-            gs('dingSmallHigh').play()
-            
-        except ZeroDivisionError:
-            s.current_input = 'خطا: تقسیم بر صفر'
-            s.update_display()
-            gs('error').play()
-            teck(2.0, s.clear_all)
-        except Exception as e:
-            s.current_input = f'خطا: {str(e)}'
-            s.update_display()
-            gs('error').play()
-            teck(2.0, s.clear_all)
+            if not s.operation or s.reset_next_input: return
+            num1 = float(s.previous_input)
+            num2 = float(s.get_raw_text())
+            result = {'+':num1+num2, '-':num1-num2, '*':num1*num2, '/':num1/num2 if num2!=0 else float('nan'), '**':num1**num2}[s.operation]
+            s.current_input=str(int(result)) if result.is_integer() else str(result)
+            s.operation=None; s.reset_next_input=True; s.update_display(); gs('dingSmallHigh').play()
+        except ZeroDivisionError: s.current_input='Error: Div/0'; s.update_display(); gs('error').play(); teck(2.0,s.clear_all)
+        except Exception as e: s.current_input=f'Error: {e}'; s.update_display(); gs('error').play(); teck(2.0,s.clear_all)
     
-    def clear_all(s):
-        s.current_input = '0'
-        s.previous_input = ''
-        s.operation = None
-        s.reset_next_input = False
-        s.update_display()
-        gs('swish').play()
+    # Clear
+    def clear_all(s): s.current_input='0'; s.previous_input=''; s.operation=None; s.reset_next_input=False; s.update_display(); gs('swish').play()
     
+    # Copy/Send
     def copy_result(s):
         try:
             if CIS():
                 from babase import clipboard_set_text
-                # استفاده از متن نمایش داده شده (با ویرگول) برای کپی
-                result = s.get_display_text()
-                clipboard_set_text(result)
-                push(f'کپی شد: {result}', color=(0, 1, 0))
-                gs('dingSmall').play()
-            else:
-                AR.err('کلیپ‌بورد پشتیبانی نمی‌شود!')
-        except Exception as e:
-            AR.err(f'خطا در کپی: {str(e)}')
-    
+                clipboard_set_text(s.get_display_text())
+                push(f'Copied: {s.get_display_text()}', color=(0,1,0)); gs('dingSmall').play()
+            else: AR.err('Clipboard not supported!')
+        except Exception as e: AR.err(f'Copy error: {e}')
     def send_to_chat(s):
         try:
-            # استفاده از متن نمایش داده شده (با ویرگول) برای ارسال به چت
-            result = s.get_display_text()
-            CM(result)
-            push(f'ارسال شد: {result}', color=(0, 1, 0))
+            CM(s.get_display_text()); push(f'Sent: {s.get_display_text()}', color=(0,1,0)); gs('dingSmall').play()
+        except Exception as e: AR.err(f'Send error: {e}')
+    
+    # Helper for unary operations
+    def _unary_op(s, func, allow_negative=True, zero_error=False, int_only=False, positive_only=False):
+        try:
+            current = float(s.get_raw_text())
+            if not allow_negative and current<0: raise ValueError
+            if zero_error and current==0: raise ZeroDivisionError
+            if int_only: current=int(current)
+            if positive_only and current<=0: raise ValueError
+            result = func(current)
+            s.current_input=str(int(result)) if int_only or (isinstance(result,float) and result.is_integer()) else str(result)
+            s.update_display(); gs('dingSmall').play()
+        except: s.current_input='Error'; s.update_display(); gs('error').play(); teck(2.0,s.clear_all)
+    def _binary_op(s, op_symbol, prompt_msg): s.operation=op_symbol; s.previous_input=s.get_raw_text(); s.reset_next_input=True; push(prompt_msg,color=(0,1,1)); gs('click01').play()
+            
+"""بخش بهاری با اسپم جملات معمولی و فانوسی و مدیریت جملات"""
+"""بخش بهاری با اسپم جملات معمولی و فانوسی و مدیریت جملات"""
+"""بخش بهاری با اسپم جملات معمولی و فانوسی و مدیریت جملات"""
+"""بخش بهاری با اسپم جملات معمولی و ناموسی"""
+class Bahari:
+    # متغیرهای global برای وضعیت اسپم
+    spamming = False
+    spam_timer = None
+    spam_type = None
+    active_instance = None
+    
+    # لیست‌های جملات
+    normal_sentences = [
+        "د آخه کحیرم تو قیافت بچه من سه سال پیش این ادعا رو داشتم",
+        "انقد هرشب دارم میکامت حامله شدی دیگه",
+        "هرچی کحیره میکنم تو قیافت کحیری فیس",
+        "کحیری هرشب داری میمالی بهت نون بدم بعد شاخیدی",
+        "افغانی بیا برو کحیرم بخواب بعد گوه بخور"
+    ]
+    
+    namousi_sentences = [
+        "مادرتو دیشب انقد کاییدم نه ماه دیگه برات داداش میاره",
+        "فیلم مادرت تو پورن هاب در حال ساک زدن لو رفته",
+        "خواهرت سر کوچه نشسته هرشب ساک میزنه",
+        "هرچی کحیر تو جهانه تو مونث خانوادت میکنم",
+        "مادرتو جوری میکام جوری که کحصش پاره بشه",
+        "کل درختای جهان و میکنم تو کحص مادرت",
+        "کحیرم تو کحص مادرت  مادرتو به سیصد روش میکام"
+    ]
+
+    def __init__(s, source):
+        # ثبت خود به عنوان نمونه فعال
+        Bahari.active_instance = s
+
+        w = s.w = AR.cw(
+            source=source,
+            size=(500, 350),
+            ps=AR.UIS()*0.7
+        )
+        # افزودن دکمه بستن
+        AR.add_close_button(w, position=(470, 300))
+        
+        # عنوان
+        tw(
+            parent=w,
+            text=u'\ue027 Obscenity',
+            scale=1.0,
+            position=(329, 275),
+            h_align='center',
+            color=(1, 0.7, 0.9)
+        )
+        
+        bw(
+            parent=w,
+            size=(70, 70),
+            position=(335, 5),
+            label='',
+            texture=gt('controllerIcon'),
+            color=(1, 1, 1)
+        )
+        
+        # اسکرول برای دکمه‌ها
+        s.scroll = sw(
+            parent=w,
+            size=(200, 250),
+            position=(20, 50)
+        )
+        
+        s.container = cw(
+            parent=s.scroll,
+            size=(200, 250),
+            background=False
+        )
+        
+        # دکمه معمولی
+        s.normal_btn = bw(
+            parent=s.container,
+            label='Normal',
+            size=(180, 35),
+            icon=gt('achievementSuperPunch'),
+            position=(10, 200),
+            iconscale=0.9,
+            on_activate_call=Call(s.confirm_spam, 'normal'),
+            color=(0.4, 0.8, 0.5),
+            textcolor=(1, 1, 1)
+        )
+        
+        # دکمه ناموسی
+        s.namousi_btn = bw(
+            parent=s.container,
+            label='Family', 
+            size=(180, 35),
+            icon=gt('achievementBoxer'),
+            position=(10, 150),
+            iconscale=0.9,
+            on_activate_call=Call(s.confirm_spam, 'namousi'),
+            color=(0.9, 0.6, 0.3),
+            textcolor=(1, 1, 1)
+        )
+        
+        # دکمه استپ
+        s.stop_btn = bw(
+            parent=s.container,
+            label='Stop',
+            size=(180, 30),
+            icon=gt('crossOut'),
+            position=(10, 100),
+            iconscale=0.9,
+            on_activate_call=Call(s.stop_spam),
+            color=(0.8, 0.2, 0.2),
+            textcolor=(1, 1, 1),
+            enable_sound=True
+        )
+        
+        # دکمه‌های مدیریت جملات
+        s.manage_normal_btn = bw(
+            parent=s.container,
+            label='Normal management',
+            size=(180, 30),
+            icon=gt('settingsIcon'),
+            position=(10, 60),
+            iconscale=0.9,
+            on_activate_call=Call(s.manage_sentences, 'normal'),
+            color=(0.3, 0.5, 0.8),
+            textcolor=(1, 1, 1)
+        )
+        
+        s.manage_namousi_btn = bw(
+            parent=s.container,
+            label='Family management',
+            size=(180, 30),
+            icon=gt('settingsIcon'),
+            position=(10, 20),
+            iconscale=0.9,
+            on_activate_call=Call(s.manage_sentences, 'namousi'),
+            color=(0.8, 0.5, 0.3),
+            textcolor=(1, 1, 1)
+        )
+        
+        # دکمه خاموش/روشن
+        s.toggle_btn = bw(
+            parent=w,
+            label='OFF',
+            size=(80, 35),
+            position=(330, 70),
+            on_activate_call=Call(s.toggle_state),
+            color=(0.35, 0, 0),
+            textcolor=(0.5, 0, 0)
+        )
+        
+        # وضعیت
+        s.status_text = tw(
+            parent=w,
+            text='Ready',
+            position=(350, 230),
+            scale=0.7,
+            color=(0.8, 0.8, 1),
+            h_align='center'
+        )
+        
+        # آمار جملات در سمت راست
+        s.stats_text = tw(
+            parent=w,
+            text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: Inactive',
+            position=(350, 200),
+            scale=0.55,
+            color=(0.7, 1, 0.7),
+            maxwidth=150,
+            h_align='center'
+        )
+        
+        # بروزرسانی وضعیت بر اساس وضعیت global
+        if Bahari.spamming:
+            bw(s.stop_btn, color=(1, 0.3, 0.3))
+            type_name = 'Normal' if Bahari.spam_type == 'normal' else 'Family'
+            tw(s.status_text, text=f'Spam {type_name} active', color=(0, 1, 0))
+            bw(s.toggle_btn, label='ON', color=(0, 0.45, 0), textcolor=(0, 0.6, 0))
+            tw(s.stats_text, text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: Active')
+        
+        AR.swish()
+    
+    def toggle_state(s):
+        """تغییر حالت خاموش/روشن"""
+        if Bahari.spamming:
+            s.stop_spam()
+            bw(s.toggle_btn, label='OFF', color=(0.35, 0, 0), textcolor=(0.5, 0, 0))
+            tw(s.stats_text, text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: Inactive')
+        else:
+            if not Bahari.spam_type:
+                AR.err('Please select the spam type first!')
+                return
+            s.start_spam()
+            bw(s.toggle_btn, label='ON', color=(0, 0.45, 0), textcolor=(0, 0.6, 0))
+            tw(s.stats_text, text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: Active')
+    
+    def confirm_spam(s, spam_type):
+        """تأیید شروع اسپم"""
+        Bahari.spam_type = spam_type
+        type_name = 'Normal' if spam_type == 'normal' else 'Family'
+        
+        # ایجاد پنجره تأیید
+        confirm_win = AR.cw(
+            source=s.w,
+            size=(300, 140),
+            ps=AR.UIS()*0.6
+        )
+        
+        AR.add_close_button(confirm_win, position=(250, 105))
+        
+        tw(
+            parent=confirm_win,
+            text=f'Are you sure you want to start\nspam {type_name}?',
+            position=(115, 80),
+            scale=0.7,
+            color=(1, 1, 1),
+            h_align='center'
+        )
+        
+        def start_and_close():
+            s.start_spam()
+            AR.swish(confirm_win)
+        
+        bw(
+            parent=confirm_win,
+            label='Yes',
+            size=(70, 25),
+            icon=gt('startButton'),
+            position=(120, 10),
+            iconscale=0.6,
+            on_activate_call=start_and_close,
+            color=(0, 0.6, 0)
+        )
+    
+    def start_spam(s):
+        """شروع اسپم"""
+        if Bahari.spamming:
+            AR.err('Spam is in progress!')
+            return
+        
+        Bahari.spamming = True
+        
+        # بروزرسانی وضعیت در صورت وجود ویجت‌ها
+        if s.status_text.exists():
+            tw(s.status_text, text='Spamming...', color=(0, 1, 0))
+        if s.stop_btn.exists():
+            bw(s.stop_btn, color=(1, 0.3, 0.3))
+        if s.toggle_btn.exists():
+            bw(s.toggle_btn, label='ON', color=(0, 0.45, 0), textcolor=(0, 0.6, 0))
+        if s.stats_text.exists():
+            tw(s.stats_text, text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: Active')
+        
+        # لیست جملات بر اساس نوع
+        if Bahari.spam_type == 'normal':
+            sentences = s.normal_sentences
+        else:
+            sentences = s.namousi_sentences
+        
+        s.sentences = sentences
+        s.current_index = 0
+        s.do_spam()
+        
+        type_name = 'Normal' if Bahari.spam_type == 'normal' else 'Family'
+        push(f'Start spam {type_name}', color=(0, 1, 0))
+        gs('dingSmallHigh').play()
+    
+    def do_spam(s):
+        """انجام اسپم"""
+        if not Bahari.spamming:
+            return
+            
+        try:
+            # ارسال جمله فعلی
+            sentence = s.sentences[s.current_index]
+            CM(sentence)
+            
+            # افزایش ایندکس برای جمله بعدی
+            s.current_index = (s.current_index + 1) % len(s.sentences)
+            
+            # بروزرسانی وضعیت
+            if s.status_text.exists():
+                tw(s.status_text, text=f'Send: {sentence[:12]}...')
+            
+            # تنظیم تایمر برای جمله بعدی
+            Bahari.spam_timer = teck(2.0, s.do_spam)
+            
+        except Exception as e:
+            AR.err(f'Error in spam: {str(e)}')
+            s.stop_spam()
+    
+    def stop_spam(s):
+        """توقف اسپم"""
+        if not Bahari.spamming:
+            return
+            
+        Bahari.spamming = False
+        
+        if Bahari.spam_timer:
+            try:
+                Bahari.spam_timer.cancel()
+            except:
+                pass
+            Bahari.spam_timer = None
+        
+        # بروزرسانی وضعیت در صورت وجود ویجت‌ها
+        if s.stop_btn.exists():
+            bw(s.stop_btn, color=(0.8, 0.2, 0.2))
+        if s.status_text.exists():
+            tw(s.status_text, text='Stopped', color=(1, 0.5, 0))
+        if s.toggle_btn.exists():
+            bw(s.toggle_btn, label='OFF', color=(0.35, 0, 0), textcolor=(0.5, 0, 0))
+        if s.stats_text.exists():
+            tw(s.stats_text, text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: Inactive')
+        
+        type_name = 'Normal' if Bahari.spam_type == 'normal' else 'Family'
+        push(f'Spam {type_name} stopped', color=(1, 0.5, 0))
+        gs('dingSmallLow').play()
+    
+    def manage_sentences(s, sentence_type):
+        """مدیریت جملات"""
+        sentences = s.normal_sentences if sentence_type == 'normal' else s.namousi_sentences
+        type_name = 'Normal' if sentence_type == 'normal' else 'Family'
+        
+        win = AR.cw(
+            source=s.w,
+            size=(380, 350),
+            ps=AR.UIS()*0.6
+        )
+        
+        AR.add_close_button(win, position=(350, 310))
+        
+        tw(
+            parent=win,
+            text=f'\ue020 Manage sentences {type_name}',
+            scale=0.9,
+            position=(175, 305),
+            h_align='center',
+            color=(1, 1, 0)
+        )
+        
+        # اسکرول برای لیست جملات
+        scroll = sw(
+            parent=win,
+            size=(340, 180),
+            position=(20, 120)
+        )
+        
+        container = cw(
+            parent=scroll,
+            size=(340, len(sentences) * 35),
+            background=False
+        )
+        
+        # نمایش جملات
+        y_pos = len(sentences) * 30 - 10
+        for i, sentence in enumerate(sentences):
+            # جمله
+            tw(
+                parent=container,
+                text=f"{i+1}. {sentence}",
+                position=(10, y_pos),
+                scale=0.5,
+                color=(1, 1, 1),
+                maxwidth=220,
+                h_align='left'
+            )
+            
+            # دکمه حذف
+            bw(
+                parent=container,
+                label='',
+                size=(30, 20),
+                icon=gt('crossOut'),
+                position=(280, y_pos),
+                iconscale=0.9,
+                on_activate_call=Call(s.delete_sentence, sentence_type, i, win),
+                color=(0.8, 0.2, 0.2),
+                text_scale=0.5
+            )
+            
+            y_pos -= 30
+        
+        # دکمه افزودن جمله جدید
+        bw(
+            parent=win,
+            label='Add Sentence',
+            size=(120, 25),
+            icon=gt('nextLevelIcon'),
+            position=(140, 70),
+            iconscale=0.9,
+            on_activate_call=Call(s.add_new_sentence, sentence_type, win),
+            color=(0.2, 0.7, 0.3),
+            textcolor=(1, 1, 1)
+        )
+        
+        # دکمه بازنشانی
+        bw(
+            parent=win,
+            label='Reset',
+            size=(120, 25),
+            icon=gt('replayIcon'),
+            position=(140, 25),
+            iconscale=0.9,
+            on_activate_call=Call(s.reset_sentences, sentence_type, win),
+            color=(0.5, 0.5, 0.8),
+            textcolor=(1, 1, 1)
+        )
+        
+    def add_new_sentence(s, sentence_type, parent_win):
+        """افزودن جمله جدید"""
+        def save_sentence():
+            new_sentence = tw(query=text_input).strip()
+            if new_sentence:
+                if sentence_type == 'normal':
+                    s.normal_sentences.append(new_sentence)
+                else:
+                    s.namousi_sentences.append(new_sentence)
+                
+                push(f'New sentence added', color=(0, 1, 0))
+                gs('dingSmallHigh').play()
+                AR.swish(add_win)
+                s.manage_sentences(sentence_type)
+                # بروزرسانی آمار
+                if s.stats_text.exists():
+                    tw(s.stats_text, text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: {"Active" if Bahari.spamming else "Inactive"}')
+            else:
+                AR.err('Please enter a sentence!')
+        
+        add_win = AR.cw(
+            source=parent_win,
+            size=(320, 160),
+            ps=AR.UIS()*0.5
+        )
+        
+        AR.add_close_button(add_win, position=(290, 120))
+        
+        type_name = 'Normal' if sentence_type == 'normal' else 'Family'
+        tw(
+            parent=add_win,
+            text=f'New sentence {type_name}:',
+            position=(20, 110),
+            scale=0.7,
+            color=(1, 1, 1)
+        )
+        
+        text_input = tw(
+            parent=add_win,
+            position=(20, 70),
+            size=(280, 30),
+            editable=True,
+            text='',
+            color=(0.9, 0.9, 0.9),
+            description="Enter your sentence"
+        )
+        
+        bw(
+            parent=add_win,
+            label='Save',
+            size=(80, 25),
+            icon=gt('upButton'),
+            position=(120, 25),
+            iconscale=0.6,
+            on_activate_call=save_sentence,
+            color=(0, 0.6, 0)
+        )
+    
+    def delete_sentence(s, sentence_type, index, parent_win):
+        """حذف جمله"""
+        sentences = s.normal_sentences if sentence_type == 'normal' else s.namousi_sentences
+        sentence = sentences[index]
+        
+        def confirm_delete():
+            sentences.pop(index)
+            push('Sentence deleted', color=(1, 0.5, 0))
+            gs('dingSmallLow').play()
+            AR.swish(confirm_win)
+            s.manage_sentences(sentence_type)
+            # بروزرسانی آمار
+            if s.stats_text.exists():
+                tw(s.stats_text, text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: {"Active" if Bahari.spamming else "Inactive"}')
+        
+        confirm_win = AR.cw(
+            source=parent_win,
+            size=(320, 140),
+            ps=AR.UIS()*0.5
+        )
+        
+        AR.add_close_button(confirm_win, position=(290, 120))
+        
+        tw(
+            parent=confirm_win,
+            text=f'Are you sure you want to delete this sentence?',
+            position=(130, 90),
+            scale=0.6,
+            color=(1, 1, 1),
+            h_align='center'
+        )
+        
+        bw(
+            parent=confirm_win,
+            label='Yes',
+            size=(80, 25),
+            position=(125, 25),
+            on_activate_call=confirm_delete,
+            color=(0.3, 0.6, 0.3)
+        )
+    
+    def reset_sentences(s, sentence_type, parent_win):
+        """بازنشانی جملات به پیش‌فرض"""
+        def confirm_reset():
+            if sentence_type == 'normal':
+                s.normal_sentences = [
+                    "بهار آمده، طبیعت بیدار شده",
+                    "گلها شکفته، جهان زیبا شده",
+                    "نسیم بهاری، خنک و فرح بخش",
+                    "پرندگان آواز، بهار را بشارت می‌دهند",
+                    "درختان سبز، جهان را زنده کرده‌اند"
+                ]
+            else:
+                s.namousi_sentences = [
+                    "ناموس خانواده، قابل احترام است",
+                    "حفظ ناموس، نشانه شخصیت است",
+                    "ناموس، امانتی الهی است",
+                    "حرمت ناموس، حرمت انسانیت است",
+                    "ناموس، سرمایه خانواده است"
+                ]
+            
+            push('Sentences reset', color=(0, 1, 1))
+            gs('dingSmallHigh').play()
+            AR.swish(confirm_win)
+            s.manage_sentences(sentence_type)
+            # بروزرسانی آمار
+            if s.stats_text.exists():
+                tw(s.stats_text, text=f'📊 Sentence statistics:\n\nNormal: {len(s.normal_sentences)}\nNamousi: {len(s.namousi_sentences)}\n\n🔧 Status: {"Active" if Bahari.spamming else "Inactive"}')
+        
+        confirm_win = AR.cw(
+            source=parent_win,
+            size=(350, 140),
+            ps=AR.UIS()*0.5
+        )
+        
+        AR.add_close_button(confirm_win, position=(300, 100))
+        
+        type_name = 'Normal' if sentence_type == 'normal' else 'Family'
+        tw(
+            parent=confirm_win,
+            text=f'Are you sure you want to \nreset the {type_name} sentences?',
+            position=(140, 90),
+            scale=0.6,
+            color=(1, 1, 1),
+            h_align='center'
+        )
+        
+        bw(
+            parent=confirm_win,
+            label='Yes',
+            size=(100, 30),
+            icon=gt('replayIcon'),
+            position=(130, 10),
+            iconscale=0.6,
+            on_activate_call=confirm_reset,
+            color=(0.3, 0.6, 0.3)
+        )
+        
+# کلاس جدید برای دکمه پینگ
+class PingButton:
+    def __init__(s, source):
+        s.w = AR.cw(
+            source=source,
+            size=(150, 80),
+            ps=AR.UIS()*0.5
+        )
+        
+        # دکمه پینگ
+        s.ping_btn = bw(
+            parent=s.w,
+            label=f'{current_ping} ms',
+            size=(120, 40),
+            position=(15, 30),
+            on_activate_call=s.send_ping,
+            color=(0.3, 0.6, 0.8),
+            textcolor=(1, 1, 1)
+        )
+        
+        # تایمر برای بروزرسانی خودکار
+        teck(1.0, s.update_ping_button)
+        
+        AR.swish()
+    
+    def update_ping_button(s):
+        """بروزرسانی متن دکمه پینگ"""
+        try:
+            if s.ping_btn.exists():
+                # تعیین رنگ بر اساس پینگ
+                if current_ping < 100:
+                    btn_color = (0.2, 0.8, 0.2)  # سبز
+                elif current_ping < 300:
+                    btn_color = (0.8, 0.8, 0.2)  # زرد
+                else:
+                    btn_color = (0.8, 0.2, 0.2)  # قرمز
+                
+                bw(s.ping_btn, 
+                   label=f'{current_ping} ms',
+                   color=btn_color)
+        except:
+            pass
+        
+        # ادامه تایمر
+        teck(1.0, s.update_ping_button)
+    
+    def send_ping(s):
+        """ارسال پینگ به چت"""
+        try:
+            ping_message = f"🏓 Ping : {current_ping} ms"
+            CM(ping_message)
+            push(f'Ping sent : {current_ping} ms', color=(0, 1, 0))
             gs('dingSmall').play()
         except Exception as e:
-            AR.err(f'خطا در ارسال: {str(e)}')
-
+            AR.err(f'Error sending ping : {str(e)}')
+            
+class BsRushWindow:
+    def __init__(s, source):
+        w = s.w = AR.cw(
+            source=source,
+            size=(400, 300),
+            ps=AR.UIS()*0.7
+        )
+        
+        # افزودن دکمه بستن
+        AR.add_close_button(w, position=(360, 270))
+        
+        # عنوان اصلی
+        tw(
+            parent=w,
+            text='⚡BsRush Menu',
+            scale=1.2,
+            position=(170, 250),
+            h_align='center',
+            color=(0, 1, 1)
+        )
+        
+        # نام سازنده
+        tw(
+            parent=w,
+            text='Subscribe to the channels below \nto download more mods.',
+            scale=0.8,
+            position=(190, 220),
+            h_align='center',
+            color=(1, 1, 0)
+        )
+        
+        # متن معرفی دکمه‌ها
+        tw(
+            parent=w,
+            text='Click on the buttons to open links in browser.',
+            scale=0.7,
+            position=(180, 150),
+            h_align='center',
+            color=(0, 1, 0)
+        )
+        
+        # دکمه اول - کانال رسمی
+        bw(
+            parent=w,
+            label='Official Channel',
+            size=(180, 35),
+            icon=gt('achievementEmpty'),
+            position=(20, 110),
+            iconscale=0.9,
+            on_activate_call=Call(s.open_url, 'https://t.me/BsRushGames'),
+            color=(0.2, 0.6, 0.9),
+            textcolor=(1, 1, 1)
+        )
+        
+        # دکمه دوم - گپ
+        bw(
+            parent=w,
+            label='Group',
+            size=(180, 35),
+            icon=gt('achievementTeamPlayer'),
+            position=(210, 110),
+            iconscale=0.9,
+            on_activate_call=Call(s.open_url, 'https://t.me/BSRush_Gap'),
+            color=(0.3, 0.7, 0.4),
+            textcolor=(1, 1, 1)
+        )
+        
+        # دکمه سوم - کانال مودها
+        bw(
+            parent=w,
+            label='Mods Channel',
+            size=(180, 35),
+            icon=gt('discordServer'),
+            position=(110, 70),
+            iconscale=0.9,
+            on_activate_call=Call(s.open_url, 'https://t.me/BsRush_Mod'),
+            color=(0.8, 0.4, 0.6),
+            textcolor=(1, 1, 1)
+        )
+        
+        # آیکون
+        bw(
+            parent=w,
+            size=(70, 70),
+            position=(175, 5),
+            label='',
+            texture=gt('discordServer'),
+            color=(1, 1, 1)
+        )
+        
+        AR.swish()
+    
+    def open_url(s, url):
+        """باز کردن لینک در مرورگر"""
+        try:
+            import babase
+            babase.open_url(url)
+            push(f'Opening: {url}', color=(0, 1, 0))
+            gs('dingSmall').play()
+        except Exception as e:
+            push(f'❌ Error opening URL: {str(e)}', color=(1, 0, 0))
+                
 # ba_meta require api 9
 # ba_meta export plugin
 class byTaha(Plugin):
@@ -4284,68 +5942,100 @@ class byTaha(Plugin):
         def e(self,*a,**k):
             r = o(self,*a,**k)
             
+            b_bsrush = AR.bw(
+                icon=gt('achievementOffYouGo'),
+                position=(self._width-570, self._height-80),  # زیر دکمه پینگ
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='BsRush'
+            )
+            bw(b_bsrush, on_activate_call=Call(BsRushWindow, source=b_bsrush))
+            
+            # مثلاً در کلاس byTaha بعد از ایجاد دکمه اصلی:
+            b_ping = AR.bw(
+                icon=gt('coin'),
+                position=(self._width-570, self._height-48),  # بالای همه دکمه‌ها
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='Ping'
+            )
+            bw(b_ping, on_activate_call=Call(PingButton, source=b_ping))
+            
+            # دکمه بهاری با آیکون
+            b_bahari = AR.bw(
+                icon=gt('trophy'),
+                position=(self._width+10, self._height-304),
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='obscenity'
+            )
+            bw(b_bahari, on_activate_call=Call(Bahari, source=b_bahari))
+            
             b_calculator = AR.bw(
-                icon=gt('egg1'),
+                icon=gt('tv'),
                 position=(self._width+10, self._height-48),  # بالاتر از دکمه اصلی
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='ماشین حساب'
+                label='Calculator'
             )
             bw(b_calculator, on_activate_call=Call(Calculator, source=b_calculator))
             
             # دکمه نمادها با آیکون
             b_icons = AR.bw(
-                icon=gt('egg3'),  
+                icon=gt('upButton'),  
                 position=(self._width+10, self._height-112), 
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='نمادها'
+                label='Icons'
             )
             bw(b_icons, on_activate_call=Call(show_icons_menu, source_widget=b_icons))
             
             # دکمه تغییر رنگ UI با آیکون
             b_uicolor = AR.bw(
-                icon=gt('egg2'),
+                icon=gt('storeCharacterXmas'),
                 position=(self._width+10, self._height-144),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='رنگ UI'
+                label='UI Color'
             )
             bw(b_uicolor, on_activate_call=Call(UIColorChanger, source=b_uicolor))
             
             # دکمه اطلاعات بازیکنان با آیکون
             b_playerinfo = AR.bw(
-                icon=gt('ouyaOButton'),
+                icon=gt('achievementSuperPunch'),
                 position=(self._width+10, self._height-176),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='بازیکنان'
+                label='Players'
             )
             bw(b_playerinfo, on_activate_call=Call(PlayerInfo, source=b_playerinfo))
             
             # دکمه چت لاگ با آیکون
             b_chatlog = AR.bw(
-                icon=gt('logo'),
+                icon=gt('logIcon'),
                 position=(self._width+10, self._height-240),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='چت لاگ'
+                label='Chat Log'
             )
             bw(b_chatlog, on_activate_call=Call(ChatLog, source=b_chatlog))
             
             # دکمه فونت‌ساز با آیکون
             b_font = AR.bw(
-                icon=gt('star'),
+                icon=gt('goldPass'),
                 position=(self._width+10, self._height-208),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='فونت‌ساز'
+                label='Font Maker'
             )
             bw(b_font, on_activate_call=Call(FontMaker, source=b_font))
             
@@ -4356,7 +6046,7 @@ class byTaha(Plugin):
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='استیکر'
+                label='Stickers'
             )
             bw(b_sticker, on_activate_call=Call(StickerMenu, source=b_sticker))
             
@@ -4367,7 +6057,7 @@ class byTaha(Plugin):
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='پیام اتوماتیک'
+                label='Auto Msg'
             )
             bw(b_main, on_activate_call=Call(AR, source=b_main))
             
