@@ -1,432 +1,225 @@
-Self By Taha 🎮✨
+🔹 English Description (Game Style – Extended)
 
-Created by: Taha OstadSharif (@Taha_OstadSharif)
-Copyright: 2025 - ByTaha
+🚀 Welcome to SelfTaha v3.0 – API9 🚀
+A next-generation game mod created by Taha OstadSharif (@Taha_OstadSharif) for the legendary BombSquad.
+If you’re tired of boring chats, repetitive typing, and slow reactions in online lobbies, this mod is here to completely change the way you play.
 
-A powerful all-in-one mod for BombSquad that provides smart auto-reply to chat messages and extensive features for chat management, entertainment, and game control.
+🎯 What is SelfTaha?
+
+SelfTaha is not just a simple auto-responder – it’s a multifunctional gaming assistant that transforms your chat, boosts your multiplayer experience, and makes your gameplay smarter, faster, and more entertaining.
+
+Whether you want to auto-reply with style, spam fun jokes, roll dice in-game, or even switch accounts instantly, this mod has your back.
 
 
 ---
 
-🚀 Main Features
+🛠️ Core Features
 
-💬 Smart Reply
+⚡ Unlimited Triggers & Responses
 
-Custom triggers for automatic replies
+Add as many auto-replies as you want.
 
-Wildcard support for message search
+Set custom delays for each response to look more natural.
 
-Configurable delay for responses
 
-Reply to yourself or others
+🌀 Dynamic Variables – make your responses ALIVE:
 
-Case-sensitive options
+%m → your name
 
+%s → message sender
 
-🎮 Fun & Game Features
+%t → current time
 
-Persian jokes: over 50 short and funny jokes
+%d → Gregorian date
 
-Persian proverbs: a treasure of wisdom
+%f → Jalali (Persian) date
 
-Short riddles: over 50 riddles with answers
+%j → random joke
 
-Truth or Dare Game: 50+ Truth questions & 50+ Dare challenges
+%ch → riddle
 
-Dice rolling for betting 🎲
+%z → proverb
 
+%dice → dice roll 🎲
 
-🔤 Advanced Font Maker
+%tr / %da → truth or dare mini-game
 
-Convert text into over 20 different font styles:
-Bold, Italic, Cursive, DoubleStruck, Fraktur, Parentheses, Tiny, Serif, Monospace, SmallCaps, Bubble, Squares, Wide, Circle, Negative, Script, Gothic, MathBold, MathItalic, MathBoldItalic, MathScript, MathDoubleStruck, MathFraktur, MathSans, MathSansBold, MathSansItalic, MathSansBoldItalic, SmallCaps2, FullWidth, Squared
+%ip → server IP & Port
 
-⚡ Quick Chat & Message Management
+%p → ping test
 
-Save and manage frequently used messages
 
-Add, delete, and reset messages
+📋 Advanced In-Game UI
 
-One-click quick send
+Add, edit, or remove responses without coding.
 
-JSON file storage
+Clean, user-friendly interface made for players.
 
 
-🌐 Network & Server Tools
+🌍 Server Management
 
-Show real server info: IP, Port, Name
+Auto-Reconnect if you get disconnected.
 
-Measure real ping via UDP socket
+Join back to your favorite server in milliseconds.
 
-Reconnect to server
+Save servers list & switch anytime.
 
-Copy server info to clipboard
 
+⚡ Extra Fun Tools
 
-⚙️ Advanced Game Control
+Quick Chat system for instant messages.
 
-Speed control: 4 modes: Normal (1.0x), Slow (0.7x), Epic (0.5x), Ultra Slow (0.3x)
+Built-in Font Generator (Bold, Italic, Bubble, Gothic & more).
 
+Account Switcher for multiple profiles.
 
-📊 Player Management
-
-Show full player list
-
-Detailed info per player (name, ID, device, status)
-
-Copy player info
-
-Mention players in chat
-
-Kick individual or all players
-
-
-💾 Advanced Chat Log
-
-Show last 300 messages
-
-Search and filter messages
-
-Show/hide timestamp
-
-Statistics and analytics
-
-Copy messages to clipboard
-
-
-🎭 Sticker & Emoji System
-
-Manage custom stickers
-
-Add emojis only
-
-Delete and reset stickers
-
-JSON storage
-
-Preloaded common emojis
-
-
-📅 Time & Date Tools
-
-Show current time ⏰
-
-Show Gregorian & precise Solar Hijri date 📆
-
-Support time variables in replies
-
-
-🔔 Notifications & Sounds
-
-Notify on auto-reply
-
-Ring sounds and effects
-
-Enable/disable sounds
-
-
-🛠️ Technical Features
-
-🎨 UI
-
-Modern Material Design
-
-Scrollable lists
-
-Colorful and recognizable buttons
-
-Responsive windows
-
-
-💾 Storage
-
-Use game config system for settings
-
-JSON for large data
-
-Unified configuration management
-
-
-🛡️ Anti-Spam
-
-Prevent spam with 4-second delay
-
-Smart request management
-
-Prevent duplicate messages
-
-
-🔄 Game Integration
-
-Override core connection functions
-
-Add quick access buttons
-
-
-
----
-
-📦 How to Use
-
-1. Activate the mod in-game
-
-
-2. Access main menu via added buttons
-
-
-3. Define triggers in “Add” section
-
-
-4. Configure options in “Settings”
-
-
-5. Use features via menus
+Game Speed Controller for custom experiences.
 
 
 
 
 ---
 
-🎯 Use Cases
+🎮 Why You’ll Love It
 
-Public servers: auto-reply to frequent questions
+Imagine you’re in a heated match.
+💬 Someone texts you → SelfTaha answers instantly with a joke or custom message.
+⚡ Connection drops → SelfTaha reconnects you faster than anyone.
+🎲 Bored in lobby → Play Truth-or-Dare or roll dice with friends directly in chat.
+✨ Want to stand out → Send messages with fancy fonts & styles.
 
-Private servers: interactive fun games
+This isn’t just a mod… it’s your personal gaming sidekick inside BombSquad.
 
-Competitions: dice & mini-games for betting
 
-Education: riddles & proverbs for learning
+---
 
-Management: player and server tools
+🏆 Perfect For:
+
+Streamers who want interactive auto-chat.
+
+Players who want to dominate chat & look cool.
+
+Friends who love mini-games & fun in lobby.
+
+Gamers who value speed, automation, and style.
 
 
 
 ---
 
-📝 Technical Notes
+🔹 توضیحات فارسی (نسخه گیمی و خفن)
 
-API Version: 9
+🔥 به دنیای SelfTaha v3.0 – API9 خوش اومدی 🔥
+این یه مود معمولی نیست، یه دستیار گیمینگ همه‌کاره ساخته شده توسط طاها استادشریف (@Taha_OstadSharif) برای بازی BombSquad ـه.
+دیگه لازم نیست تایپ‌های تکراری و خسته‌کننده انجام بدی. از این به بعد، مود خودت جواب میده، خودت شوخی می‌کنه، خودت جو سرور رو گرم می‌کنه!
 
-Optimized large codebase
 
-Smooth performance
+---
 
-Compatible with various BombSquad versions
+🎯 SelfTaha چیه؟
+
+یک سیستم فوق‌پیشرفته برای:
+
+پاسخ‌گویی خودکار به پیام‌ها با استایل.
+
+ارسال جوک، چیستان و ضرب‌المثل به صورت رندوم.
+
+بازی‌های کوچیک مثل حقیقت یا جرئت وسط چت.
+
+مدیریت حرفه‌ای سرورها و اتصال سریع‌تر از همه.
+
+تغییر اکانت، فونت‌های خفن و حتی کنترل سرعت بازی.
 
 
 
 ---
 
-نسخه فارسی 🇮🇷
+🛠️ قابلیت‌های اصلی
 
-ساخته شده توسط: طاها استادشریف (@Taha_OstadSharif)
-حقوق نشر: 2025 - ByTaha
+⚡ تریگر و پاسخ بی‌نهایت
 
-یک مود پیشرفته و همه‌کاره برای BombSquad که قابلیت پاسخگویی خودکار به پیام‌ها و امکانات گسترده برای مدیریت چت، سرگرمی و کنترل بازی را فراهم می‌کند.
+هر چندتا دستور می‌خوای اضافه کن.
 
+زمان تاخیر بذار که طبیعی‌تر به نظر برسه.
 
----
 
-🚀 قابلیت‌های اصلی
+🌀 متغیرهای پویا برای چت زنده
 
-💬 سیستم پاسخگویی خودکار
+%m → اسم خودت
 
-تعریف ماشه‌های سفارشی برای پاسخ خودکار
+%s → فرستنده پیام
 
-پشتیبانی از Wildcard برای جستجو در متن پیام
+%t → ساعت الان
 
-تنظیم تأخیر زمانی برای پاسخ
+%d → تاریخ میلادی
 
-پاسخ‌دهی به خود یا دیگران
+%f → تاریخ شمسی
 
-حساسیت به حروف بزرگ و کوچک
+%j → جوک تصادفی 🤣
 
+%ch → چیستان
 
-🎮 امکانات سرگرمی و بازی
+%z → ضرب‌المثل
 
-جوک‌های فارسی: بیش از ۵۰ جوک کوتاه و بامزه
+%dice → تاس بنداز 🎲
 
-ضرب‌المثل‌های فارسی: گنجینه‌ای از حکمت‌ها
+%tr / %da → بازی حقیقت یا جرئت
 
-چیستان‌های کوتاه: بیش از ۵۰ چیستان جذاب با جواب
+%ip → آی‌پی و پورت سرور
 
-بازی جرئت یا حقیقت: بیش از ۵۰ سوال Truth و ۵۰ چالش Dare
+%p → نمایش پینگ
 
-تاس‌اندازی برای شرط‌بندی 🎲
 
+📋 رابط کاربری درون بازی
 
-🔤 فونت‌ساز پیشرفته
+اضافه، حذف یا ویرایش پاسخ‌ها بدون حتی یک خط کدنویسی.
 
-تبدیل متن به بیش از ۲۰ سبک فونت مختلف: Bold, Italic, Cursive, DoubleStruck, Fraktur, Parentheses, Tiny, Serif, Monospace, SmallCaps, Bubble, Squares, Wide, Circle, Negative, Script, Gothic, MathBold, MathItalic, MathBoldItalic, MathScript, MathDoubleStruck, MathFraktur, MathSans, MathSansBold, MathSansItalic, MathSansBoldItalic, SmallCaps2, FullWidth, Squared
+محیط ساده، زیبا و گیمرپسند.
 
-⚡ چت سریع و مدیریت پیام‌ها
 
-ذخیره و مدیریت پیام‌های پرکاربرد
+🌍 مدیریت سرور حرفه‌ای
 
-افزودن، حذف و بازنشانی پیام‌ها
+Reconnect سریع‌تر از همه.
 
-ارسال سریع با یک کلیک
+Auto Reconnect وقتی اینترنتت قطع میشه.
 
-ذخیره در فایل JSON
+لیست سرورها رو ذخیره کن و هر وقت خواستی بپر روش.
 
 
-🌐 ابزارهای شبکه و سرور
+⚡ ابزارهای سرگرم‌کننده اضافه
 
-نمایش اطلاعات سرور واقعی: IP, پورت، نام
+چت سریع برای جواب آماده.
 
-اندازه‌گیری پینگ واقعی با سوکت UDP
+تولید فونت‌های متنوع (بولد، حبابی، فانتزی و …).
 
-امکان اتصال مجدد به سرور
+تعویض سریع اکانت (Account Switcher).
 
-کپی اطلاعات سرور به کلیپ‌بورد
-
-
-⚙️ کنترل پیشرفته بازی
-
-کنترل سرعت بازی: ۴ حالت مختلف (عادی، اسلو، آپیک، اولترا اسلو)
-
-
-📊 مدیریت بازیکنان
-
-نمایش لیست کامل بازیکنان
-
-اطلاعات دقیق هر بازیکن (نام، ID، دستگاه، وضعیت)
-
-کپی اطلاعات بازیکنان
-
-منشن کردن بازیکنان در چت
-
-اخراج فردی یا گروهی بازیکنان
-
-
-💾 سیستم چت لاگ پیشرفته
-
-نمایش ۳۰۰ پیام آخر
-
-جستجو و فیلتر پیام‌ها
-
-نمایش/مخفی کردن زمان ارسال
-
-آمار و آنالیز پیام‌ها
-
-کپی پیام‌ها به کلیپ‌بورد
-
-
-🎭 سیستم استیکر و ایموجی
-
-مدیریت استیکرهای دلخواه
-
-افزودن فقط ایموجی
-
-حذف و بازنشانی استیکرها
-
-ذخیره در JSON
-
-استیکرهای پیش‌فرض شامل ایموجی‌های پرکاربرد
-
-
-📅 امکانات زمانی و تاریخ
-
-نمایش زمان فعلی ⏰
-
-تاریخ میلادی و شمسی دقیق 📆
-
-پشتیبانی از متغیرهای زمانی در پاسخ‌ها
-
-
-🔔 سیستم اعلان و صدا
-
-اعلان هنگام پاسخ خودکار
-
-صدای زنگ و افکت‌ها
-
-قابلیت فعال/غیرفعال کردن صداها
-
-
-🛠️ قابلیت‌های فنی
-
-🎨 رابط کاربری
-
-طراحی مدرن و متریال
-
-اسکرول برای لیست‌های طولانی
-
-دکمه‌های رنگی و قابل تشخیص
-
-پنجره‌های واکنش‌گرا
-
-
-💾 ذخیره‌سازی
-
-استفاده از سیستم کانفیگ بازی
-
-فایل JSON برای داده‌های حجیم
-
-مدیریت یکپارچه پیکربندی
-
-
-🛡️ آنتی اسپم
-
-جلوگیری از اسپم با تأخیر ۴ ثانیه‌ای
-
-مدیریت هوشمند درخواست‌ها
-
-جلوگیری از ارسال پیام‌های تکراری
-
-
-🔄 یکپارچه‌سازی با بازی
-
-اورراید توابع اصلی اتصال
-
-افزودن دکمه‌های دسترسی سریع
-
-
-
----
-
-📦 نحوه استفاده
-
-1. فعال کردن مود در بازی
-
-
-2. دسترسی به منوی اصلی از طریق دکمه‌های اضافه شده
-
-
-3. تعریف ماشه‌ها در بخش "افزودن"
-
-
-4. تنظیم موارد دلخواه در "تنظیمات"
-
-
-5. استفاده از امکانات مختلف
+کنترل سرعت بازی برای تجربه متفاوت.
 
 
 
 
 ---
 
-🎯 موارد استفاده
+🎮 چرا عاشقش میشی؟
 
-سرورهای عمومی: پاسخ خودکار به سوالات پرتکرار
+تصور کن وسط لابی هستی:
+💬 یکی پیامت میده → SelfTaha با یه جوک خفن جواب میده.
+⚡ از سرور می‌پری → تو چند ثانیه سریع‌تر از همه برمی‌گردی.
+🎲 حوصله‌ت سر رفته → بازی Truth-or-Dare یا تاس بازی وسط چت.
+✨ می‌خوای خاص باشی → پیام‌هات با فونت‌های عجیب و خفن میره بالا.
 
-سرورهای خصوصی: بازی‌های تعاملی و سرگرمی
-
-مسابقات: تاس و بازی‌ها برای شرط‌بندی
-
-آموزش: چیستان و ضرب‌المثل
-
-مدیریت: ابزارهای مدیریت بازیکنان و سرور
-
+این فقط یه مود نیست… این رفیق گیمینگت توی BombSquad ـه.
 
 
 ---
 
-📝 نکات فنی
+🏆 مناسب برای:
 
-نسخه API: 9
+استریمرهایی که دنبال چت تعاملی هستن.
 
-حجم کد: گسترده و بهینه
+پلیرهایی که می‌خوان همیشه توی لابی بدرخشن.
 
-اجرای روان و بهینه
+کسایی که عشق فان و بازی‌های کوچیک وسط چت دارن.
 
-سازگار با نسخه‌های مختلف BombSquad
+گیمرهایی که سرعت، اتوماتیک بودن و استایل براشون مهمه.
