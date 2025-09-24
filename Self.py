@@ -1,4 +1,4 @@
-# SelfTaha v3.0 - API9
+# Auto Message v3.0 - API9
 # Copyright 2025 - ByTaha
 # ساخته شده توسط طاها استادشریف (@Taha_OstadSharif)
 # این مود به صورت خودکار به پیام‌های دریافتی پاسخ می‌دهد
@@ -42,6 +42,8 @@ from bauiv1lib.popup import PopupWindow, PopupMenu
 from typing import Sequence, Tuple, Optional, Callable
 from bauiv1lib.colorpicker import ColorPicker
 import random
+from bauiv1lib.party import PartyWindow
+from bauiv1lib.ingamemenu import InGameMenuWindow
 import math
 import json
 import os
@@ -2448,12 +2450,8 @@ class AR:
         buttons = [
              ('Add', 'Add', 'upButton', 550),
              ('Delete', 'Nuke', 'ouyaAButton', 485),
-             ('Settings', 'Tune', 'settingsIcon', 420),             ('List', 'List', 'logIcon', 355),
-             ('Quick Chat', 'QuickChat','achievementOutline', 290),
-             ('Spam', 'Spam', 'startButton', 95),
-             ('Server info', 'ServerInfo', 'star', 225),
-             ('Reconnect', 'Reconnect', 'replayIcon', 160),      
-             ('Help', 'Help', 'logo', 30)
+             ('Settings', 'Tune', 'settingsIcon', 420),             ('List', 'List', 'logIcon', 355),     
+             ('Help', 'Help', 'logo', 290)
 ]
         
         for label, cls_name, icon, y_pos in buttons:
@@ -5922,7 +5920,545 @@ class BsRushWindow:
             gs('dingSmall').play()
         except Exception as e:
             push(f'❌ Error opening URL: {str(e)}', color=(1, 0, 0))
+            
+class SimpleCamera:
+    def __init__(self):
+        self.rotating = False
+        self.rotation_timer = None
+        self.rotation_angle = 0
+    
+    def open_camera_menu(self, source_widget):
+        """باز کردن منوی دوربین دستی"""
+        try:
+            import _babase
+            import babase
+            import bauiv1 as bui
+            import math
+            
+            # ایجاد پنجره عریض‌تر
+            w = bui.containerwidget(
+                parent=bui.get_special_widget('overlay_stack'),
+                size=(1100, 600),  # عرض بیشتر شده به 1100
+                transition='in_scale',
+                scale=1.0,
+                color=(0.15, 0.15, 0.15)
+            )
+            
+            # عنوان اصلی
+            bui.textwidget(
+                parent=w,
+                text='🎥 Manual Camera Control',
+                position=(550, 550),  # موقعیت جدید برای عرض بیشتر
+                scale=1.5,
+                color=(0, 1, 1),
+                h_align='center'
+            )
+            
+            # متن توضیحی
+            bui.textwidget(
+                parent=w,
+                text='Control the game camera manually',
+                position=(550, 500),  # موقعیت جدید
+                scale=0.8,
+                color=(1, 1, 0.8),
+                h_align='center'
+            )
+            
+            # بخش موقعیت دوربین
+            bui.textwidget(
+                parent=w,
+                text='📷 CAMERA POSITION',
+                position=(150, 450),  # موقعیت جدید
+                scale=1.1,
+                color=(0, 1, 0),
+                h_align='center'
+            )
+            
+            # دکمه‌های موقعیت - با فاصله بیشتر
+            # ردیف X
+            bui.buttonwidget(
+                parent=w,
+                label='← X-',
+                size=(90, 45),
+                icon=gt('ouyaOButton'),
+                position=(10, 330),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=babase.Call(self._move_camera_simple, 'x-'),
+                color=(0.8, 0.3, 0.3),
+                textcolor=(1, 1, 1)
+            )
+            
+            bui.buttonwidget(
+                parent=w,
+                label='→ X+',
+                size=(90, 45),
+                icon=gt('ouyaIcon'),
+                position=(150, 330), 
+                iconscale=0.6, # موقعیت جدید
+                on_activate_call=babase.Call(self._move_camera_simple, 'x'),
+                color=(0.3, 0.8, 0.3),
+                textcolor=(1, 1, 1)
+            )
+            
+            # ردیف Y
+            bui.buttonwidget(
+                parent=w,
+                label='↑ Y+',
+                size=(90, 45),
+                icon=gt('ouyaUButton'),
+                position=(75, 390),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=babase.Call(self._move_camera_simple, 'y'),
+                color=(0.3, 0.3, 0.8),
+                textcolor=(1, 1, 1)
+            )
+            
+            bui.buttonwidget(
+                parent=w,
+                label='↓ Y-',
+                size=(90, 45),
+                icon=gt('ouyaAButton'),
+                position=(75, 270),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=babase.Call(self._move_camera_simple, 'y-'),
+                color=(0.8, 0.8, 0.3),
+                textcolor=(1, 1, 1)
+            )
+            
+            # ردیف Zoom
+            bui.buttonwidget(
+                parent=w,
+                label='Zoom IN',
+                size=(100, 45),
+                icon=gt('upButton'),
+                position=(270, 390),
+                iconscale=0.6,  # موقعیت جدید
+                on_activate_call=babase.Call(self._move_camera_simple, 'z'),
+                color=(0.8, 0.3, 0.8),
+                textcolor=(1, 1, 1)
+            )
+            
+            bui.buttonwidget(
+                parent=w,
+                label='Zoom OUT',
+                size=(100, 45),
+                icon=gt('downButton'),
+                position=(270, 330),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=babase.Call(self._move_camera_simple, 'z-'),
+                color=(0.3, 0.8, 0.8),
+                textcolor=(1, 1, 1)
+            )
+            
+            # بخش target دوربین
+            bui.textwidget(
+                parent=w,
+                text='🎯 CAMERA TARGET',
+                position=(900, 450),  # موقعیت جدید
+                scale=1.1,
+                color=(1, 0.5, 0),
+                h_align='center'
+            )
+            
+            # دکمه‌های target
+            bui.buttonwidget(
+                parent=w,
+                label='Target X-',
+                size=(110, 45),
+                icon=gt('ouyaAButton'),
+                position=(800, 330), 
+                iconscale=0.6, # موقعیت جدید
+                on_activate_call=babase.Call(self._move_target_simple, 'x-'),
+                color=(0.8, 0.5, 0.3),
+                textcolor=(1, 1, 1)
+            )
+            
+            bui.buttonwidget(
+                parent=w,
+                label='Target X+',
+                size=(110, 45),
+                icon=gt('ouyaUButton'),
+                position=(930, 330),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=babase.Call(self._move_target_simple, 'x'),
+                color=(0.5, 0.8, 0.3),
+                textcolor=(1, 1, 1)
+            )
+            
+            bui.buttonwidget(
+                parent=w,
+                label='Target Y+',
+                size=(110, 45),
+                icon=gt('ouyaIcon'),
+                position=(865, 390),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=babase.Call(self._move_target_simple, 'y'),
+                color=(0.3, 0.5, 0.8),
+                textcolor=(1, 1, 1)
+            )
+            
+            bui.buttonwidget(
+                parent=w,
+                label='Target Y-',
+                size=(110, 45),
+                icon=gt('ouyaOButton'),
+                position=(865, 270),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=babase.Call(self._move_target_simple, 'y-'),
+                color=(0.8, 0.3, 0.5),
+                textcolor=(1, 1, 1)
+            )
+            
+            # بخش چرخش دوربین
+            bui.textwidget(
+                parent=w,
+                text=' CAMERA ROTATION',
+                position=(550, 450),  # موقعیت جدید
+                scale=1.1,
+                color=(1, 0.8, 0),
+                h_align='center'
+            )
+            
+            # دکمه چرخش دوربین
+            self.rotate_btn = bui.buttonwidget(
+                parent=w,
+                label='START ROTATION',
+                size=(180, 50),
+                icon=gt('startButton'),
+                position=(485, 390),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=self._toggle_rotation,
+                color=(0.6, 0.3, 0.8),
+                textcolor=(1, 1, 1)
+            )
+            
+            # دکمه‌های جهت چرخش
+            bui.buttonwidget(
+                parent=w,
+                label='Right',
+                size=(120, 40),
+                icon=gt('rightButton'),
+                position=(600, 330),
+                iconscale=0.6,  # موقعیت جدید
+                on_activate_call=babase.Call(self._set_rotation_direction, 'clockwise'),
+                color=(0.4, 0.6, 0.8),
+                textcolor=(1, 1, 1)
+            )
+            
+            bui.buttonwidget(
+                parent=w,
+                label='Left',
+                size=(120, 40),
+                icon=gt('leftButton'),
+                position=(450, 330),
+                iconscale=0.6,  # موقعیت جدید
+                on_activate_call=babase.Call(self._set_rotation_direction, 'counter'),
+                color=(0.8, 0.6, 0.4),
+                textcolor=(1, 1, 1)
+            )
+            
+            # بخش تنظیمات
+            bui.textwidget(
+                parent=w,
+                text='⚙️ SETTINGS',
+                position=(550, 220),  # موقعیت جدید
+                scale=1.1,
+                color=(1, 1, 0),
+                h_align='center'
+            )
+            
+            # فیلد Step
+            bui.textwidget(
+                parent=w,
+                text='Step Size:',
+                position=(450, 180),  # موقعیت جدید
+                scale=1.0,
+                color=(1, 1, 1)
+            )
+            
+            self.step_field = bui.textwidget(
+                parent=w,
+                position=(580, 170),  # موقعیت جدید
+                size=(150, 40),
+                text='1.0',
+                editable=True,
+                max_chars=6,
+                color=(0.9, 0.9, 0.9)
+            )
+            
+            # فیلد سرعت چرخش
+            bui.textwidget(
+                parent=w,
+                text='Rotation Speed:',
+                position=(390, 130),  # موقعیت جدید
+                scale=1.0,
+                color=(1, 1, 1)
+            )
+            
+            self.speed_field = bui.textwidget(
+                parent=w,
+                position=(580, 120),  # موقعیت جدید
+                size=(150, 40),
+                text='1.0',
+                editable=True,
+                max_chars=6,
+                color=(0.9, 0.9, 0.9)
+            )
+            
+            # دکمه‌های کنترلی
+            bui.buttonwidget(
+                parent=w,
+                label=' RESET CAMERA',
+                size=(200, 55),
+                icon=gt('replayIcon'),
+                position=(350, 60),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=self._reset_camera_simple,
+                color=(0.8, 0.2, 0.2),
+                textcolor=(1, 1, 1)
+            )
+            
+            bui.buttonwidget(
+                parent=w,
+                label=' DONE',
+                size=(200, 55),
+                icon=gt('achievementOutline'),
+                position=(600, 60),  
+                iconscale=0.6,# موقعیت جدید
+                on_activate_call=babase.Call(bui.containerwidget, w, transition='out_scale'),
+                color=(0.2, 0.8, 0.2),
+                textcolor=(1, 1, 1)
+            )
+            
+            # اطلاعات وضعیت
+            self.status_text = bui.textwidget(
+                parent=w,
+                text='🎥 Camera control ready - Click buttons to adjust',
+                position=(550, 20),  # موقعیت جدید
+                scale=0.8,
+                color=(0.8, 1, 0.8),
+                h_align='center'
+            )
+            
+            # دکمه بستن در گوشه بالا راست
+            bui.buttonwidget(
+                parent=w,
+                label='X',
+                size=(70, 70),
+                position=(1020, 545),
+                on_activate_call=babase.Call(bui.containerwidget, w, transition='out_scale'),
+                color=(0.8, 0.2, 0.2),
+                textcolor=(1, 1, 1)
+            )
+            
+            # متغیرهای چرخش
+            self.rotation_direction = 'clockwise'
+            self.rotation_angle = 0
+            
+            self._update_status("🎥 Camera control ready - Adjust as needed")
+            
+        except Exception as e:
+            print(f"Error opening camera menu: {e}")
+    
+    def _toggle_rotation(self):
+        """شروع یا توقف چرخش دوربین"""
+        try:
+            import bauiv1 as bui
+            
+            if not self.rotating:
+                # شروع چرخش
+                self.rotating = True
+                bui.buttonwidget(edit=self.rotate_btn, 
+                               label='⏹️ STOP ROTATION', 
+                               color=(0.8, 0.2, 0.2))
+                self._update_status("🔄 Camera rotation STARTED")
+                self._start_rotation()
+            else:
+                # توقف چرخش
+                self.rotating = False
+                bui.buttonwidget(edit=self.rotate_btn, 
+                               label='🔄 START ROTATION', 
+                               color=(0.6, 0.3, 0.8))
+                self._update_status("⏹️ Camera rotation STOPPED")
                 
+        except Exception as e:
+            print(f"Error toggling rotation: {e}")
+    
+    def _set_rotation_direction(self, direction):
+        """تنظیم جهت چرخش"""
+        self.rotation_direction = direction
+        direction_text = "CLOCKWISE" if direction == 'clockwise' else "COUNTER-CLOCKWISE"
+        self._update_status(f"🔄 Rotation direction: {direction_text}")
+    
+    def _start_rotation(self):
+        """شروع چرخش دوربین در جای خودش"""
+        if not self.rotating:
+            return
+            
+        try:
+            import _babase
+            import bauiv1 as bui
+            import math
+            
+            # فعال کردن حالت دستی
+            _babase.set_camera_manual(True)
+            
+            # دریافت سرعت چرخش
+            try:
+                speed_text = bui.textwidget(query=self.speed_field)
+                speed = float(speed_text) if speed_text else 2.0
+            except:
+                speed = 2.0
+            
+            # محاسبه زاویه جدید
+            if self.rotation_direction == 'clockwise':
+                self.rotation_angle += speed
+            else:
+                self.rotation_angle -= speed
+            
+            # محدود کردن زاویه بین 0 تا 360
+            self.rotation_angle %= 360
+            
+            # گرفتن موقعیت فعلی دوربین و target
+            camera_pos = _babase.get_camera_position()
+            target_pos = _babase.get_camera_target()
+            
+            # محاسبه فاصله بین دوربین و target
+            dx = target_pos[0] - camera_pos[0]
+            dy = target_pos[1] - camera_pos[1]
+            dz = target_pos[2] - camera_pos[2]
+            distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+            
+            # چرخش دوربین حول target (دوربین در جای خودش می‌چرخد)
+            if distance > 0:
+                dx /= distance
+                dy /= distance
+                dz /= distance
+                
+                # چرخش حول محور Y (چرخش افقی)
+                rad_angle = math.radians(speed if self.rotation_direction == 'clockwise' else -speed)
+                cos_angle = math.cos(rad_angle)
+                sin_angle = math.sin(rad_angle)
+                
+                # چرخش بردار جهت حول محور Y
+                new_dx = dx * cos_angle + dz * sin_angle
+                new_dz = -dx * sin_angle + dz * cos_angle
+                
+                # محاسبه موقعیت جدید دوربین
+                new_camera_x = target_pos[0] - new_dx * distance
+                new_camera_z = target_pos[2] - new_dz * distance
+                
+                # تنظیم موقعیت جدید دوربین
+                _babase.set_camera_position(new_camera_x, camera_pos[1], new_camera_z)
+            
+            # تنظیم تایمر برای فریم بعدی
+            self.rotation_timer = bui.apptimer(0.05, self._start_rotation)
+            
+        except Exception as e:
+            print(f"Error in rotation: {e}")
+            self.rotating = False
+    
+    def _get_step_value(self):
+        """دریافت مقدار step از فیلد"""
+        try:
+            import bauiv1 as bui
+            step_text = bui.textwidget(query=self.step_field)
+            return float(step_text) if step_text else 1.0
+        except:
+            return 1.0
+    
+    def _update_status(self, message):
+        """بروزرسانی وضعیت"""
+        try:
+            import bauiv1 as bui
+            if hasattr(self, 'status_text'):
+                bui.textwidget(edit=self.status_text, text=message)
+                print(f"Camera Status: {message}")
+        except Exception as e:
+            print(f"Error updating status: {e}")
+    
+    def _move_camera_simple(self, direction):
+        """حرکت ساده دوربین"""
+        try:
+            import _babase
+            step = self._get_step_value()
+            pos = list(_babase.get_camera_position())
+            
+            # اول حالت دستی را فعال کن
+            _babase.set_camera_manual(True)
+            
+            if direction == 'x':
+                pos[0] += step
+            elif direction == 'x-':
+                pos[0] -= step
+            elif direction == 'y':
+                pos[1] += step
+            elif direction == 'y-':
+                pos[1] -= step
+            elif direction == 'z':
+                pos[2] += step
+            elif direction == 'z-':
+                pos[2] -= step
+            
+            _babase.set_camera_position(pos[0], pos[1], pos[2])
+            self._update_status(f"📷 Camera moved {direction} by {step}")
+            
+        except Exception as e:
+            print(f"Error moving camera: {e}")
+            self._update_status("❌ Error moving camera!")
+    
+    def _move_target_simple(self, direction):
+        """حرکت ساده target"""
+        try:
+            import _babase
+            step = self._get_step_value()
+            target = list(_babase.get_camera_target())
+            
+            # اول حالت دستی را فعال کن
+            _babase.set_camera_manual(True)
+            
+            if direction == 'x':
+                target[0] += step
+            elif direction == 'x-':
+                target[0] -= step
+            elif direction == 'y':
+                target[1] += step
+            elif direction == 'y-':
+                target[1] -= step
+            
+            _babase.set_camera_target(target[0], target[1], target[2])
+            self._update_status(f"🎯 Target moved {direction} by {step}")
+            
+        except Exception as e:
+            print(f"Error moving target: {e}")
+            self._update_status("❌ Error moving target!")
+    
+    def _reset_camera_simple(self):
+        """بازنشانی دوربین به حالت اتوماتیک"""
+        try:
+            import _babase
+            self.rotating = False
+            _babase.set_camera_manual(False)
+            self._update_status("🔄 Camera reset to AUTO mode!")
+        except Exception as e:
+            print(f"Error resetting camera: {e}")
+            self._update_status("❌ Error resetting camera!")
+    
+    def _done_camera_simple(self, window):
+        """بستن پنجره - دوربین را به حالت اتوماتیک برگردان"""
+        try:
+            import bauiv1 as bui
+            import _babase
+            self.rotating = False
+            _babase.set_camera_manual(False)
+            bui.containerwidget(edit=window, transition='out_scale')
+            self._update_status("✅ Window closed - Camera returned to AUTO mode")
+        except Exception as e:
+            print(f"Error in done_camera: {e}")
+
+# ایجاد نمونه
+camera_control = SimpleCamera()
+
 # ba_meta require api 9
 # ba_meta export plugin
 class byTaha(Plugin):
@@ -5942,6 +6478,17 @@ class byTaha(Plugin):
         def e(self,*a,**k):
             r = o(self,*a,**k)
             
+# در متد __init__ کلاس byTaha، بعد از دکمه BsRush:
+            b_camera = AR.bw(
+                icon=gt('tv'),
+                position=(self._width-570, self._height-112),
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='Camera'
+            )
+            bw(b_camera, on_activate_call=lambda: camera_control.open_camera_menu(b_camera))
+            
             b_bsrush = AR.bw(
                 icon=gt('achievementOffYouGo'),
                 position=(self._width-570, self._height-80),  # زیر دکمه پینگ
@@ -5951,6 +6498,27 @@ class byTaha(Plugin):
                 label='BsRush'
             )
             bw(b_bsrush, on_activate_call=Call(BsRushWindow, source=b_bsrush))
+            
+            reconnect_btn = AR.bw(
+                icon=gt('replayIcon'),
+               position=(self._width-570, self._height-208),
+               parent=self._root_widget,
+               iconscale=0.6,
+               size=(80,25),
+               label='Reconnect',
+               on_activate_call=Call(Reconnect, self._root_widget)  
+            )
+            
+            # دکمه Server Info زیر دکمه Reconnect
+            b_serverinfo = AR.bw(
+                icon=gt('star'),
+                position=(self._width-570, self._height-240),  # زیر دکمه Reconnect
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='Server Info'
+            )
+            bw(b_serverinfo, on_activate_call=Call(ServerInfo, b_serverinfo))
             
             # مثلاً در کلاس byTaha بعد از ایجاد دکمه اصلی:
             b_ping = AR.bw(
@@ -5974,8 +6542,28 @@ class byTaha(Plugin):
             )
             bw(b_bahari, on_activate_call=Call(Bahari, source=b_bahari))
             
+            b_spam = AR.bw(
+                icon=gt('startButton'),
+                position=(self._width-570, self._height-176),  # بالاتر از دکمه اصلی
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='Spam'
+            )
+            bw(b_spam, on_activate_call=Call(Spam, source=b_spam))
+            
+            b_quickchat = AR.bw(
+                icon=gt('bombButton'),
+                position=(self._width-570, self._height-144),  # بالاتر از دکمه اصلی
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='Quick Chat'
+            )
+            bw(b_quickchat, on_activate_call=Call(QuickChat, source=b_quickchat))
+            
             b_calculator = AR.bw(
-                icon=gt('tv'),
+                icon=gt('chTitleChar2'),
                 position=(self._width+10, self._height-48),  # بالاتر از دکمه اصلی
                 parent=self._root_widget,
                 iconscale=0.6,
