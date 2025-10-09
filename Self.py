@@ -6459,6 +6459,482 @@ class SimpleCamera:
 # ایجاد نمونه
 camera_control = SimpleCamera()
 
+"""Practice Tools - بدون قابلیت دیسکو لایت"""
+class PracticeTools:
+    def __init__(s, source):
+        # ویندوز اصلی با ارتفاع کمتر
+        s.w = AR.cw(
+            source=source,
+            size=(600, 300),  # ارتفاع کمتر شده
+            ps=AR.UIS()*0.7
+        )
+        AR.add_close_button(s.w, position=(570, 260))
+        
+        # عنوان
+        tw(
+            parent=s.w,
+            text='⚡ Practice Tools',
+            scale=1.0,
+            position=(280, 270),
+            h_align='center',
+            color=(0, 1, 1)
+        )
+        
+        # === بخش سمت راست: توضیحات ===
+        tw(
+            parent=s.w,
+            text="🎮 Game Tools:\n"
+                 "• Player effects\n"
+                 "• Visual settings\n" 
+                 "• Game controls\n\n"
+                 "💡 Use for practice\nand training!",
+            position=(350, 240),
+            scale=0.45,
+            color=(0.8, 0.8, 1),
+            maxwidth=200,
+            h_align='left'
+        )
+        
+        # آمار و وضعیت
+        s.stats_text = tw(
+            parent=s.w,
+            text="📊 Status:\n"
+                 "• Tint: Normal\n"
+                 "• Game: Active\n"
+                 "• Effects: OFF",
+            position=(350, 90),
+            scale=0.5,
+            color=(0.8, 1, 0.8),
+            maxwidth=180,
+            h_align='left'
+        )
+        
+        # === بخش سمت چپ: دکمه‌های اسکرولی ===
+        
+        # ایجاد اسکرول ویجت برای دکمه‌ها
+        s.scroll_widget = sw(
+            parent=s.w,
+            size=(300, 180),  # ارتفاع اسکرول کمتر
+            position=(20, 50)
+        )
+        
+        # ایجاد کانتینر برای دکمه‌ها
+        s.buttons_container = cw(
+            parent=s.scroll_widget,
+            size=(300, 500),  # ارتفاع کمتر
+            background=False
+        )
+        
+        # ایجاد دکمه‌ها
+        s.create_scrollable_buttons()
+        
+        AR.swish()
+        
+        # متغیرهای تنظیمات
+        s.current_tint = (1.0, 1.0, 1.0)
+        
+        # تایمر بروزرسانی وضعیت
+        teck(1.0, s.update_status)
+    
+    def create_scrollable_buttons(s):
+        """ایجاد دکمه‌ها در کانتینر اسکرولی"""
+        buttons_data = [
+            # افکت‌های اصلی
+            ('❄️ Freeze', s.apply_freeze, (10, 470), (280, 25), (0.2, 0.7, 0.9)),
+            ('🔥 Unfreeze', s.apply_unfreeze, (10, 440), (280, 25), (0.9, 0.7, 0.2)),
+            ('⚡ Super Speed', s.apply_super_speed, (10, 410), (280, 25), (0.3, 0.6, 0.9)),
+            ('🛡️ Invincible', s.apply_invincible, (10, 380), (280, 25), (0.8, 0.8, 0.2)),
+            ('👑 God Mode', s.apply_god_mode, (10, 350), (280, 25), (0.9, 0.3, 0.3)),
+            
+            # تنظیمات نور
+            ('🎨 Tint +', bs.Call(s.adjust_tint, 1.1), (10, 320), (135, 25), (0.9, 0.7, 0.3)),
+            ('🎨 Tint -', bs.Call(s.adjust_tint, 0.9), (155, 320), (135, 25), (0.8, 0.6, 0.2)),
+            ('🌈 Random Tint', s.random_tint, (10, 290), (280, 25), (0.7, 0.4, 0.9)),
+            
+            # کنترل بازی
+            ('⏸️ Pause/Resume', s.toggle_pause, (10, 260), (135, 25), (0.8, 0.8, 0.2)),
+            ('🐌 Slow Motion', s.toggle_slowmo, (155, 260), (135, 25), (0.8, 0.5, 0.2)),
+            
+            # تنظیمات دستی
+            ('🎨 Custom RGB', s.show_custom_rgb, (10, 230), (280, 25), (0.9, 0.5, 0.2)),
+            ('🔄 Reset All', s.reset_all_settings, (10, 200), (280, 25), (0.8, 0.2, 0.2))
+        ]
+        
+        # ایجاد دکمه‌ها
+        s.button_widgets = []
+        for label, callback, pos, size, color in buttons_data:
+            btn = bw(
+                parent=s.buttons_container,
+                label=label,
+                size=size,
+                position=pos,
+                on_activate_call=callback,
+                color=color,
+                textcolor=(1, 1, 1),
+                text_scale=0.35
+            )
+            s.button_widgets.append(btn)
+        
+        # تنظیم ارتفاع واقعی کانتینر
+        total_height = 500
+        cw(s.buttons_container, size=(300, total_height))
+    
+    def update_status(s):
+        """بروزرسانی وضعیت فعلی"""
+        if not hasattr(s, 'w') or not s.w.exists():
+            return
+        
+        try:
+            activity = bs.get_foreground_host_activity()
+            if activity and hasattr(activity, 'globalsnode'):
+                tint_status = f"{s.current_tint[0]:.1f},{s.current_tint[1]:.1f},{s.current_tint[2]:.1f}"
+                game_status = "Paused" if activity.globalsnode.paused else "Active"
+                slowmo_status = "Slowmo" if activity.globalsnode.slow_motion else "Normal"
+                
+                status_text = (f"📊 Status:\n"
+                             f"• Tint: {tint_status}\n"
+                             f"• Game: {game_status}\n" 
+                             f"• Speed: {slowmo_status}\n"
+                             f"• Ready for practice!")
+                
+                tw(s.stats_text, text=status_text)
+            
+            # ادامه تایمر
+            teck(1.0, s.update_status)
+            
+        except:
+            # ادامه تایمر حتی در صورت خطا
+            teck(1.0, s.update_status)
+    
+    # ==================== متدهای اصلی ====================
+    
+    def get_target_player(s):
+        """دریافت بازیکن هدف"""
+        try:
+            activity = bs.get_foreground_host_activity()
+            if activity and hasattr(activity, 'players'):
+                for player in activity.players:
+                    if (player.actor and hasattr(player.actor, 'node') and 
+                        player.actor.node and player.actor.node.exists()):
+                        return player.actor
+            return None
+        except:
+            return None
+    
+    def apply_freeze(s):
+        """یخ زدن"""
+        target = s.get_target_player()
+        if target:
+            target.handlemessage(bs.FreezeMessage())
+            s._show_floating_text("FROZEN", target.node.position, (0.2, 0.7, 0.9))
+            
+            # ارسال پیام به چت
+            s.send_chat_message("❄️ Player Frozen! 🧊")
+            
+            push('Player frozen!', color=(0.2, 0.7, 0.9))
+            gs('freeze').play()
+        else:
+            push('No player found!', color=(1, 0, 0))
+    
+    def apply_unfreeze(s):
+        """آزاد کردن از یخ"""
+        target = s.get_target_player()
+        if target:
+            target.handlemessage(bs.ThawMessage())
+            s._show_floating_text("UNFROZEN", target.node.position, (0.9, 0.7, 0.2))
+            
+            # ارسال پیام به چت
+            s.send_chat_message("🔥 Player Unfrozen! 🔥")
+            
+            push('Player unfrozen!', color=(0.9, 0.7, 0.2))
+            gs('thaw').play()
+        else:
+            push('No player found!', color=(1, 0, 0))
+    
+    def apply_super_speed(s):
+        """سرعت فوق‌العاده"""
+        target = s.get_target_player()
+        if target:
+            target.node.hockey = True
+            s._show_floating_text("SUPER SPEED", target.node.position, (0.3, 0.6, 0.9))
+            
+            # ارسال پیام به چت
+            s.send_chat_message("⚡ Super Speed Activated! 🏃💨")
+            
+            push('Super speed activated!', color=(0.3, 0.6, 0.9))
+            gs('powerup01').play()
+        else:
+            push('No player found!', color=(1, 0, 0))
+    
+    def apply_invincible(s):
+        """غیرقابل آسیب"""
+        target = s.get_target_player()
+        if target:
+            target.node.invincible = True
+            s._show_floating_text("INVINCIBLE", target.node.position, (0.8, 0.8, 0.2))
+            
+            # ارسال پیام به چت
+            s.send_chat_message("🛡️ Invincibility Activated! 🛡️")
+            
+            push('Invincibility activated!', color=(0.8, 0.8, 0.2))
+            gs('powerup01').play()
+        else:
+            push('No player found!', color=(1, 0, 0))
+    
+    def apply_god_mode(s):
+        """حالت خدا"""
+        target = s.get_target_player()
+        if target:
+            # فعال کردن تمام قابلیت‌های گاد مود
+            target.node.invincible = True
+            target.node.hockey = True
+            target.node.hurt = 0.0
+            target._punch_power_scale = 15.0
+            target._punch_cooldown = 0
+                  
+            s._show_floating_text("GOD MODE", target.node.position, (0.9, 0.3, 0.3))
+            
+            # ارسال پیام به چت
+            s.send_chat_message("👑 GOD MODE ACTIVATED! ⚡💪")
+            
+            push('GOD MODE ACTIVATED!', color=(0.9, 0.3, 0.3))
+            gs('achievement').play()
+        else:
+            push('No player found!', color=(1, 0, 0))
+    
+    def random_tint(s):
+        """تینت تصادفی"""
+        try:
+            activity = bs.get_foreground_host_activity()
+            if activity and hasattr(activity, 'globalsnode'):
+                r = random.uniform(0.0, 10.0)
+                g = random.uniform(0.0, 10.0)
+                b = random.uniform(0.0, 10.0)
+                
+                activity.globalsnode.tint = (r, g, b)
+                s.current_tint = (r, g, b)
+                
+                # ارسال پیام به چت
+                s.send_chat_message(f"🌈 Random Tint Applied: R:{r:.1f} G:{g:.1f} B:{b:.1f}")
+                
+                push('Random tint applied!', color=(r, g, b))
+                gs('powerup01').play()
+        except:
+            push('Error setting random tint!', color=(1, 0, 0))
+    
+    def adjust_tint(s, factor):
+        """تنظیم tint نور - بدون محدودیت"""
+        try:
+            activity = bs.get_foreground_host_activity()
+            if activity and hasattr(activity, 'globalsnode'):
+                current = activity.globalsnode.tint
+                new_tint = (
+                    current[0] * factor,
+                    current[1] * factor,
+                    current[2] * factor
+                )
+                activity.globalsnode.tint = new_tint
+                s.current_tint = new_tint
+                
+                # ارسال پیام به چت
+                s.send_chat_message(f"🎨 Tint Adjusted: x{factor}")
+                
+                push('Tint adjusted!', color=(0.9, 0.7, 0.3))
+        except:
+            push('Error adjusting tint!', color=(1, 0, 0))
+    
+    def toggle_pause(s):
+        """توقف/ادامه بازی"""
+        try:
+            activity = bs.get_foreground_host_activity()
+            if activity and hasattr(activity, 'globalsnode'):
+                activity.globalsnode.paused = not activity.globalsnode.paused
+                status = "PAUSED" if activity.globalsnode.paused else "RESUMED"
+                
+                # ارسال پیام به چت
+                s.send_chat_message(f"⏸️ Game {status}! 🎮")
+                
+                push(f'Game {status.lower()}!', color=(1, 1, 0))
+                gs('click01').play()
+        except:
+            push('Error toggling pause!', color=(1, 0, 0))
+    
+    def toggle_slowmo(s):
+        """حالت slow motion"""
+        try:
+            activity = bs.get_foreground_host_activity()
+            if activity and hasattr(activity, 'globalsnode'):
+                activity.globalsnode.slow_motion = not activity.globalsnode.slow_motion
+                status = "ON" if activity.globalsnode.slow_motion else "OFF"
+                
+                # ارسال پیام به چت
+                s.send_chat_message(f"🐌 Slow Motion {status}! ⏱️")
+                
+                push(f'Slow motion {status}!', color=(1, 0.5, 0))
+                gs('dingSmallHigh').play()
+        except:
+            push('Error toggling slow motion!', color=(1, 0, 0))
+    
+    def reset_all_settings(s):
+        """بازنشانی تمام تنظیمات"""
+        try:
+            activity = bs.get_foreground_host_activity()
+            if activity:
+                # بازنشانی افکت‌ها
+                if activity.players:
+                    for player in activity.players:
+                        if player.actor and player.actor.node:
+                            player.actor.node.invincible = False
+                            player.actor.node.hockey = False
+                            if hasattr(player.actor.node, 'punch_power_scale'):
+                                player.actor.node.punch_power_scale = 1.0
+                            if hasattr(player.actor.node, 'punch_cooldown'):
+                                player.actor.node.punch_cooldown = 0.3
+                
+                # بازنشانی تنظیمات بازی
+                if hasattr(activity, 'globalsnode'):
+                    activity.globalsnode.paused = False
+                    activity.globalsnode.slow_motion = False
+                    activity.globalsnode.tint = (1.0, 1.0, 1.0)
+                
+                s.current_tint = (1.0, 1.0, 1.0)
+                
+                # ارسال پیام به چت
+                s.send_chat_message("🔄 All Settings Reset! ♻️")
+                
+                push('All settings reset!', color=(0, 1, 1))
+                gs('shieldDown').play()
+        except:
+            push('Error resetting settings!', color=(1, 0, 0))
+    
+    def show_custom_rgb(s):
+        """صفحه تنظیم RGB"""
+        s.rgb_window = AR.cw(
+            source=s.w,
+            size=(400, 200),
+            ps=AR.UIS()*0.8
+        )
+        AR.add_close_button(s.rgb_window, position=(370, 160))
+        
+        tw(
+            parent=s.rgb_window,
+            text='🎨 Custom RGB',
+            scale=0.8,
+            position=(170, 170),
+            h_align='center',
+            color=(0.9, 0.5, 0.2)
+        )
+        
+        # فیلدهای RGB
+        labels = ['Red:', 'Green:', 'Blue:']
+        defaults = ['1.0', '1.0', '1.0']
+        s.rgb_inputs = []
+        
+        for i, (label, default) in enumerate(zip(labels, defaults)):
+            tw(parent=s.rgb_window, text=label, scale=0.5, 
+               position=(50, 140 - i*30), color=(1, 1, 1))
+            
+            input_widget = tw(parent=s.rgb_window, text=default, editable=True,
+                            scale=0.6, position=(100, 138 - i*30), 
+                            size=(200, 35), h_align='left')
+            s.rgb_inputs.append(input_widget)
+        
+        bw(parent=s.rgb_window, label='Apply RGB', size=(100, 25), 
+           position=(150, 50), on_activate_call=s.apply_custom_rgb, 
+           color=(0.9, 0.5, 0.2), text_scale=0.4)
+        
+        bw(parent=s.rgb_window, label='Random', size=(100, 25), 
+           position=(150, 20), on_activate_call=s.apply_random_rgb, 
+           color=(0.7, 0.3, 0.9), text_scale=0.4)
+    
+    def apply_custom_rgb(s):
+        """اعمال RGB دستی - بدون محدودیت"""
+        try:
+            values = []
+            for input_widget in s.rgb_inputs:
+                text = tw(query=input_widget)
+                value = float(text) if text.strip() else 1.0
+                values.append(value)
+            
+            if len(values) == 3:
+                r, g, b = values
+                activity = bs.get_foreground_host_activity()
+                if activity and hasattr(activity, 'globalsnode'):
+                    activity.globalsnode.tint = (r, g, b)
+                    s.current_tint = (r, g, b)
+                    
+                    # ارسال پیام به چت
+                    s.send_chat_message(f"🎨 Custom RGB Applied: R:{r} G:{g} B:{b}")
+                    
+                    push(f'RGB applied!', color=(abs(r), abs(g), abs(b)))
+                    AR.swish(s.rgb_window)
+        except Exception as e:
+            push(f'Invalid RGB values!', color=(1, 0, 0))
+    
+    def apply_random_rgb(s):
+        """اعمال RGB تصادفی - بدون محدودیت"""
+        try:
+            r = random.uniform(-5.0, 5.0)
+            g = random.uniform(-5.0, 5.0)
+            b = random.uniform(-5.0, 5.0)
+            
+            activity = bs.get_foreground_host_activity()
+            if activity and hasattr(activity, 'globalsnode'):
+                activity.globalsnode.tint = (r, g, b)
+                s.current_tint = (r, g, b)
+                
+                # ارسال پیام به چت
+                s.send_chat_message(f"🌈 Random RGB: R:{r:.1f} G:{g:.1f} B:{b:.1f}")
+                
+                push(f'Random RGB applied!', color=(abs(r), abs(g), abs(b)))
+                gs('powerup01').play()
+                
+                # بروزرسانی فیلدها
+                for i, input_widget in enumerate(s.rgb_inputs):
+                    tw(input_widget, text=f"{[r, g, b][i]:.1f}")
+                    
+        except Exception as e:
+            push(f'Random RGB error!', color=(1, 0, 0))
+    
+    def send_chat_message(s, message):
+        """ارسال پیام به چت"""
+        try:
+            CM(message)
+        except:
+            pass
+    
+    def _show_floating_text(s, text, position, color=(1, 1, 1)):
+        """نمایش متن شناور"""
+        try:
+            activity = bs.get_foreground_host_activity()
+            if activity:
+                with activity.context:
+                    text_node = bs.newnode('text',
+                        attrs={
+                            'text': text,
+                            'in_world': True,
+                            'shadow': 1.0,
+                            'flatness': 1.0,
+                            'color': color,
+                            'scale': 0.02,
+                            'h_align': 'center',
+                            'position': position
+                        })
+                    
+                    # انیمیشن ظهور و ناپدید شدن
+                    bs.animate(text_node, 'scale', {
+                        0: 0.0,
+                        0.3: 0.02,
+                        1.5: 0.02,
+                        2.0: 0.0
+                    })
+                    
+                    # حذف پس از 2 ثانیه
+                    bs.timer(2.1, text_node.delete)
+                    
+        except Exception as e:
+            print(f"Error showing floating text: {e}")
+
 # ba_meta require api 9
 # ba_meta export plugin
 class byTaha(Plugin):
@@ -6478,7 +6954,18 @@ class byTaha(Plugin):
         def e(self,*a,**k):
             r = o(self,*a,**k)
             
-# در متد __init__ کلاس byTaha، بعد از دکمه BsRush:
+            # دکمه Practice Tools
+            b_practicetools = AR.bw(
+                icon=gt('achievementOffYouGo'),
+                position=(self._width-570, self._height-272),
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='Practice'
+            )
+            bw(b_practicetools, on_activate_call=Call(PracticeTools, b_practicetools))
+            
+            # دکمه Camera Control
             b_camera = AR.bw(
                 icon=gt('tv'),
                 position=(self._width-570, self._height-112),
@@ -6489,9 +6976,10 @@ class byTaha(Plugin):
             )
             bw(b_camera, on_activate_call=lambda: camera_control.open_camera_menu(b_camera))
             
+            # دکمه BsRush
             b_bsrush = AR.bw(
                 icon=gt('achievementOffYouGo'),
-                position=(self._width-570, self._height-80),  # زیر دکمه پینگ
+                position=(self._width-570, self._height-80),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
@@ -6499,20 +6987,21 @@ class byTaha(Plugin):
             )
             bw(b_bsrush, on_activate_call=Call(BsRushWindow, source=b_bsrush))
             
+            # دکمه Reconnect
             reconnect_btn = AR.bw(
                 icon=gt('replayIcon'),
-               position=(self._width-570, self._height-208),
-               parent=self._root_widget,
-               iconscale=0.6,
-               size=(80,25),
-               label='Reconnect',
-               on_activate_call=Call(Reconnect, self._root_widget)  
+                position=(self._width-570, self._height-208),
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='Reconnect',
+                on_activate_call=Call(Reconnect, self._root_widget)  
             )
             
-            # دکمه Server Info زیر دکمه Reconnect
+            # دکمه Server Info
             b_serverinfo = AR.bw(
                 icon=gt('star'),
-                position=(self._width-570, self._height-240),  # زیر دکمه Reconnect
+                position=(self._width-570, self._height-240),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
@@ -6520,10 +7009,10 @@ class byTaha(Plugin):
             )
             bw(b_serverinfo, on_activate_call=Call(ServerInfo, b_serverinfo))
             
-            # مثلاً در کلاس byTaha بعد از ایجاد دکمه اصلی:
+            # دکمه Ping
             b_ping = AR.bw(
                 icon=gt('coin'),
-                position=(self._width-570, self._height-48),  # بالای همه دکمه‌ها
+                position=(self._width-570, self._height-48),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
@@ -6531,20 +7020,21 @@ class byTaha(Plugin):
             )
             bw(b_ping, on_activate_call=Call(PingButton, source=b_ping))
             
-            # دکمه بهاری با آیکون
+            # دکمه Obscenity (Bahari)
             b_bahari = AR.bw(
                 icon=gt('trophy'),
                 position=(self._width+10, self._height-304),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='obscenity'
+                label='Obscenity'
             )
             bw(b_bahari, on_activate_call=Call(Bahari, source=b_bahari))
             
+            # دکمه Spam
             b_spam = AR.bw(
                 icon=gt('startButton'),
-                position=(self._width-570, self._height-176),  # بالاتر از دکمه اصلی
+                position=(self._width-570, self._height-176),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
@@ -6552,9 +7042,10 @@ class byTaha(Plugin):
             )
             bw(b_spam, on_activate_call=Call(Spam, source=b_spam))
             
+            # دکمه Quick Chat
             b_quickchat = AR.bw(
                 icon=gt('bombButton'),
-                position=(self._width-570, self._height-144),  # بالاتر از دکمه اصلی
+                position=(self._width-570, self._height-144),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
@@ -6562,9 +7053,10 @@ class byTaha(Plugin):
             )
             bw(b_quickchat, on_activate_call=Call(QuickChat, source=b_quickchat))
             
+            # دکمه Calculator
             b_calculator = AR.bw(
                 icon=gt('chTitleChar2'),
-                position=(self._width+10, self._height-48),  # بالاتر از دکمه اصلی
+                position=(self._width+10, self._height-48),
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
@@ -6572,7 +7064,7 @@ class byTaha(Plugin):
             )
             bw(b_calculator, on_activate_call=Call(Calculator, source=b_calculator))
             
-            # دکمه نمادها با آیکون
+            # دکمه Icons
             b_icons = AR.bw(
                 icon=gt('upButton'),  
                 position=(self._width+10, self._height-112), 
@@ -6583,7 +7075,7 @@ class byTaha(Plugin):
             )
             bw(b_icons, on_activate_call=Call(show_icons_menu, source_widget=b_icons))
             
-            # دکمه تغییر رنگ UI با آیکون
+            # دکمه UI Color
             b_uicolor = AR.bw(
                 icon=gt('storeCharacterXmas'),
                 position=(self._width+10, self._height-144),
@@ -6594,7 +7086,7 @@ class byTaha(Plugin):
             )
             bw(b_uicolor, on_activate_call=Call(UIColorChanger, source=b_uicolor))
             
-            # دکمه اطلاعات بازیکنان با آیکون
+            # دکمه Players Info
             b_playerinfo = AR.bw(
                 icon=gt('achievementSuperPunch'),
                 position=(self._width+10, self._height-176),
@@ -6605,7 +7097,7 @@ class byTaha(Plugin):
             )
             bw(b_playerinfo, on_activate_call=Call(PlayerInfo, source=b_playerinfo))
             
-            # دکمه چت لاگ با آیکون
+            # دکمه Chat Log
             b_chatlog = AR.bw(
                 icon=gt('logIcon'),
                 position=(self._width+10, self._height-240),
@@ -6616,7 +7108,7 @@ class byTaha(Plugin):
             )
             bw(b_chatlog, on_activate_call=Call(ChatLog, source=b_chatlog))
             
-            # دکمه فونت‌ساز با آیکون
+            # دکمه Font Maker
             b_font = AR.bw(
                 icon=gt('goldPass'),
                 position=(self._width+10, self._height-208),
@@ -6627,7 +7119,7 @@ class byTaha(Plugin):
             )
             bw(b_font, on_activate_call=Call(FontMaker, source=b_font))
             
-            # دکمه استیکر با آیکون
+            # دکمه Stickers
             b_sticker = AR.bw(
                 icon=gt('heart'),
                 position=(self._width+10, self._height-272),
@@ -6638,7 +7130,7 @@ class byTaha(Plugin):
             )
             bw(b_sticker, on_activate_call=Call(StickerMenu, source=b_sticker))
             
-            # دکمه اصلی پیام اتوماتیک با آیکون
+            # دکمه اصلی Auto Message
             b_main = AR.bw(
                 icon=gt('achievementOutline'),
                 position=(self._width+10, self._height-80),
@@ -6648,6 +7140,8 @@ class byTaha(Plugin):
                 label='Auto Msg'
             )
             bw(b_main, on_activate_call=Call(AR, source=b_main))
+            
+            # دکمه خرید حذف شده است
             
             return r
         
