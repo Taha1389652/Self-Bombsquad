@@ -140,7 +140,7 @@ def new_handlemessage_spaz_(func):
 
 
 # ba_meta export babase.Plugin
-class ByCrossJoy(babase.Plugin):
+class ByTaha(babase.Plugin):
 
     def __init__(self):
         pass
