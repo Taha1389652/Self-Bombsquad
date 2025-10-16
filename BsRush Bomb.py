@@ -298,7 +298,7 @@ def add_boom_text_effect(position):
             'flatness': 1.0,
             'h_align': 'center',
             'v_align': 'center',
-            'scale': 0.06,
+            'scale': 0.04,
             'color': (1, 0.7, 0.1)
         })
         
