@@ -17,7 +17,7 @@ def overload_aura(position):
         bs.emitfx(
             position=position,
             velocity=(0, 3, 0),
-            count=20,
+            count=120,
             scale=2.0,
             spread=0.2,
             chunk_type='spark'
@@ -26,7 +26,7 @@ def overload_aura(position):
         bs.emitfx(
             position=position,
             velocity=(0, 3, 0),
-            count=20,
+            count=120,
             scale=1.0,
             spread=0.2,
             chunk_type='metal'
@@ -35,7 +35,7 @@ def overload_aura(position):
         bs.emitfx(
             position=position,
             velocity=(0, 3, 0),
-            count=20,
+            count=120,
             scale=1.0,
             spread=0.2,
             chunk_type='ice'
