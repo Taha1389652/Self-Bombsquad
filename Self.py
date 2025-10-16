@@ -50,6 +50,7 @@ import os
 import socket
 import threading
 import time
+import re
 import bascenev1 as bs
 import bauiv1 as bui
 import _babase
@@ -496,6 +497,595 @@ DEFAULT_QUICK_MESSAGES = [
     "بزن بریم"
 ]
 
+# COMPREHENSIVE PERSIAN-FINGLISH CONVERSION DICTIONARY
+# Based on standard phonetic mapping and common usage
+
+PERSIAN_TO_FINGLISH = {
+    # Vowels and basic characters
+    'آ': 'a', 'ا': 'a', 'أ': 'a', 'إ': 'e', 'ء': '', 'ئ': '', 'ؤ': '',
+    'ب': 'b', 'پ': 'p', 'ت': 't', 'ث': 's',
+    'ج': 'j', 'چ': 'ch', 'ح': 'h', 'خ': 'kh',
+    'د': 'd', 'ذ': 'z', 'ر': 'r', 'ز': 'z',
+    'ژ': 'zh', 'س': 's', 'ش': 'sh', 'ص': 's',
+    'ض': 'z', 'ط': 't', 'ظ': 'z', 'ع': '', 'غ': 'gh',
+    'ف': 'f', 'ق': 'gh',
+    'ک': 'k', 'ك': 'k', 'گ': 'g',
+    'ل': 'l', 'م': 'm', 'ن': 'n',
+    'و': 'v', 'ه': 'h', 'ة': 'h',
+    'ی': 'i', 'ي': 'i', 'ى': '',
+
+    # Diacritics
+    'ً': 'an', 'ٌ': 'on', 'ٍ': 'en', 'َ': 'a', 'ُ': 'o', 'ِ': 'e', 'ّ': '',
+    
+    # Punctuation
+    '؟': '?', '،': ',', '؛': ';', 'ـ': '-', '«': '"', '»': '"',
+}
+
+# COMPREHENSIVE WORD DATABASE - PRIORITY MAPPING
+WORD_DATABASE = {
+    # Pronouns
+    'من': 'man', 'تو': 'to', 'او': 'oo', 'ما': 'ma', 
+    'شما': 'shoma', 'آنها': 'anha', 'ایشان': 'ishan',
+    
+    # Common verbs
+    'است': 'ast', 'هست': 'hast', 'بود': 'bud', 'شد': 'shod',
+    'کرد': 'kard', 'گفت': 'goft', 'داد': 'dad', 'خورد': 'khord',
+    'آمد': 'amad', 'رفت': 'raft', 'دید': 'did', 'شنید': 'shenid',
+    
+    # Common nouns
+    'خدا': 'khoda', 'جهان': 'jahan', 'دنیا': 'donya', 'زندگی': 'zendegi',
+    'روز': 'roz', 'شب': 'shab', 'ماه': 'mah', 'سال': 'sal',
+    'کشور': 'keshvar', 'شهر': 'shahr', 'خانه': 'khane', 'اتاق': 'otagh',
+    'مادر': 'madar', 'پدر': 'pedar', 'برادر': 'baradar', 'خواهر': 'khahar',
+    'دوست': 'doost', 'دشمن': 'doshman', 'رئیس': 'rais', 'کارمند': 'karmand',
+    
+    # Adjectives
+    'خوب': 'khub', 'بد': 'bad', 'زیبا': 'ziba', 'زشت': 'zesht',
+    'بزرگ': 'bozorg', 'کوچک': 'kuchek', 'بلند': 'boland', 'کوتاه': 'kotah',
+    'سریع': 'sari', 'کند': 'kond', 'گران': 'geran', 'ارزان': 'arzan',
+    
+    # Common phrases
+    'سلام': 'salam', 'خداحافظ': 'khodahafez', 'ممنون': 'mamnoon', 
+    'لطفا': 'lotfan', 'ببخشید': 'bebakhshid', 'خواهش': 'khwahesh',
+    'چطور': 'chetor', 'چطوری': 'chetori', 'چگونه': 'chegone',
+    'چرا': 'chera', 'کی': 'ki', 'کجا': 'koja', 'چی': 'chi',
+    
+    # Slang and informal words (for complete coverage)
+    'کص': 'kos', 'کیر': 'kir', 'کسکش': 'koskesh', 'کون': 'kun',
+    'گایید': 'gayid', 'گاییدن': 'gayidan', 'گوز': 'guz', 'کصخل': 'koskhol',
+    'حرومزاده': 'haromzade', 'لاشی': 'lashi', 'جنده': 'jende',
+    'ناموس': 'namoos', 'ننت': 'nanat', 'بابات': 'babat',
+    'خار': 'khar', 'خایه': 'khaye', 'خارکسه': 'kharkose',
+    
+    # Numbers
+    'صفر': 'sefr', 'یک': 'yek', 'دو': 'do', 'سه': 'se',
+    'چهار': 'chahar', 'پنج': 'panj', 'شش': 'shesh',
+    'هفت': 'haft', 'هشت': 'hasht', 'نه': 'noh', 'ده': 'dah',
+}
+
+# CONTEXTUAL PREFIXES AND SUFFIXES
+PREFIXES_SUFFIXES = {
+    # Verb prefixes
+    'می‌': 'mi ', 'نمی‌': 'nemi ', 'بی‌': 'bi ',
+    
+    # Plural suffixes
+    'ها': 'ha', 'ان': 'an', 'ات': 'at', 'ین': 'in',
+    
+    # Other common patterns
+    'ترین': 'tarin', 'گی': 'gi', 'ی': 'i',
+}
+
+# REVERSE MAPPING - FINGLISH TO PERSIAN
+FINGLISH_TO_PERSIAN = {}
+
+# Build reverse mapping from character dictionary
+for persian, finglish in PERSIAN_TO_FINGLISH.items():
+    if finglish and finglish.strip():
+        FINGLISH_TO_PERSIAN[finglish] = persian
+
+# Build reverse mapping from word database
+for persian, finglish in WORD_DATABASE.items():
+    FINGLISH_TO_PERSIAN[finglish] = persian
+
+# Build reverse mapping from prefixes/suffixes
+for persian, finglish in PREFIXES_SUFFIXES.items():
+    if finglish and finglish.strip():
+        FINGLISH_TO_PERSIAN[finglish.strip()] = persian
+
+# COMMON FINGLISH VARIATIONS AND PATTERNS
+FINGLISH_PATTERNS = {
+    # --- Vowels ---
+    'a': 'ا', 'aa': 'آ',
+    'e': 'e',   # چون e گاهی صامت تلفظ میشه، باید در کد جدا مدیریت بشه
+    'i': 'ی', 'ee': 'ی',
+    'o': 'و', 'oo': 'و',
+    'u': 'و',
+    'y': 'ی',
+
+    # --- Common digraphs ---
+    'kh': 'خ',
+    'gh': 'غ',
+    'sh': 'ش',
+    'ch': 'چ',
+    'zh': 'ژ',
+    'jh': 'ژ',
+    'ck': 'ک',
+    'ng': 'نگ',
+
+    # --- Consonants ---
+    'b': 'ب', 'p': 'پ', 't': 'ت', 's': 'س', 'j': 'ج',
+    'h': 'ه', 'd': 'د', 'r': 'ر', 'z': 'ز', 'g': 'گ',
+    'f': 'ف', 'q': 'ق', 'k': 'ک', 'l': 'ل', 'm': 'م',
+    'n': 'ن', 'v': 'و', 'w': 'و', 'x': 'کس', # x مثل “eks”
+    'c': 'ک',  # در بیشتر موارد مثل "camera" → "کمره"
+
+    # --- Common words ---
+    'khoda': 'خدا', 'salam': 'سلام', 'chetori': 'چطوری',
+    'mamnoon': 'ممنون', 'lotfan': 'لطفاً', 'bebakhshid': 'ببخشید',
+    'man': 'من', 'to': 'تو', 'oo': 'او', 'ma': 'ما',
+    'shoma': 'شما', 'anha': 'آنها',
+}
+
+def contains_persian(text):
+    """Check if text contains Persian characters"""
+    if not text:
+        return False
+    persian_range = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]')
+    return bool(persian_range.search(text))
+
+def is_finglish(text):
+    """Advanced Finglish detection with multiple heuristics"""
+    if not text or not text.strip():
+        return False
+    
+    text_lower = text.lower().strip()
+    
+    # If it contains Persian characters, it's not Finglish
+    if contains_persian(text_lower):
+        return False
+    
+    # Common English words that should NOT be considered Finglish
+    english_only_words = {
+        'the', 'and', 'you', 'are', 'is', 'in', 'on', 'at', 'to', 'for', 
+        'with', 'this', 'that', 'what', 'where', 'when', 'why', 'how',
+        'yes', 'no', 'ok', 'hello', 'hi', 'bye', 'good', 'bad', 'very'
+    }
+    
+    words = text_lower.split()
+    
+    # Remove English-only words
+    persian_like_words = [word for word in words if word not in english_only_words]
+    
+    if not persian_like_words:
+        return False
+    
+    # Heuristic 1: Common Finglish words
+    common_finglish_words = {
+        'salam', 'chetori', 'khub', 'mamnoon', 'mersi', 'lotfan', 
+        'khodahafez', 'man', 'to', 'oo', 'ma', 'shoma', 'anha',
+        'kos', 'kir', 'koskesh', 'kun', 'gayid', 'guz', 'koskhol',
+        'haromzade', 'lashi', 'jende', 'namoos', 'nanat', 'babat'
+    }
+    
+    has_finglish_words = any(word in common_finglish_words for word in persian_like_words)
+    
+    # Heuristic 2: Finglish patterns
+    finglish_patterns = [
+        r'\b[a-z]*sh[a-z]*\b', r'\b[a-z]*ch[a-z]*\b', r'\b[a-z]*kh[a-z]*\b',
+        r'\b[a-z]*gh[a-z]*\b', r'\b[a-z]*zh[a-z]*\b',
+        r'\b[a-z]*aa[a-z]*\b', r'\b[a-z]*ee[a-z]*\b', r'\b[a-z]*oo[a-z]*\b',
+    ]
+    
+    has_finglish_pattern = any(
+        re.search(pattern, word) 
+        for word in persian_like_words 
+        for pattern in finglish_patterns
+    )
+    
+    # Heuristic 3: Word structure analysis
+    short_word_count = sum(1 for word in persian_like_words if len(word) <= 6)
+    total_words = len(persian_like_words)
+    
+    # Consider it Finglish if:
+    # - Contains known Finglish words OR
+    # - Has Finglish patterns OR  
+    # - Short words dominate (common in Persian chat)
+    return (has_finglish_words or has_finglish_pattern or 
+            (total_words > 0 and short_word_count / total_words > 0.7))
+
+def convert_persian_to_finglish(text):
+    """Professional Persian to Finglish conversion with word priority"""
+    if not text or not text.strip():
+        return text
+    
+    # Step 1: Handle prefixes and suffixes (with space handling)
+    converted = text
+    for persian, finglish in PREFIXES_SUFFIXES.items():
+        # Handle with and without space
+        converted = converted.replace(persian, finglish)
+        converted = converted.replace(persian.replace('‌', ' '), finglish)
+    
+    # Step 2: Handle complete words (longest first for priority)
+    word_sorted = sorted(WORD_DATABASE.items(), key=lambda x: len(x[0]), reverse=True)
+    for persian, finglish in word_sorted:
+        # Use word boundaries for exact matching
+        pattern = r'\b' + re.escape(persian) + r'\b'
+        converted = re.sub(pattern, finglish, converted)
+    
+    # Step 3: Character-by-character conversion for remaining text
+    for persian, finglish in PERSIAN_TO_FINGLISH.items():
+        converted = converted.replace(persian, finglish)
+    
+    # Step 4: Clean up
+    converted = re.sub(r'\s+', ' ', converted)  # Normalize spaces
+    converted = converted.strip()
+    
+    return converted
+
+def convert_finglish_to_persian(text):
+    """Professional Finglish to Persian conversion with pattern matching"""
+    if not text or not text.strip():
+        return text
+    
+    converted = text.lower()
+    
+    # Step 1: Handle complete words (longest first)
+    word_sorted = sorted(WORD_DATABASE.items(), key=lambda x: len(x[1]), reverse=True)
+    for persian, finglish in word_sorted:
+        # Use word boundaries for exact matching
+        pattern = r'\b' + re.escape(finglish) + r'\b'
+        converted = re.sub(pattern, persian, converted)
+    
+    # Step 2: Handle common patterns
+    for finglish, persian in FINGLISH_PATTERNS.items():
+        converted = converted.replace(finglish, persian)
+    
+    # Step 3: Single character conversion
+    for finglish, persian in FINGLISH_TO_PERSIAN.items():
+        if len(finglish) == 1:
+            converted = converted.replace(finglish, persian)
+    
+    # Step 4: Clean up
+    converted = re.sub(r'\s+', ' ', converted).strip()
+    
+    return converted
+
+# Global conversion mode
+convert_mode = 0  # 0: off, 1: Persian to Finglish, 2: Finglish to Persian
+
+class AdvancedConvertPanel:
+    @classmethod
+    def get_ui_scale(cls):
+        ui_scale = APP.ui_v1.uiscale
+        scale_map = {
+            uis.SMALL: 1.5,
+            uis.MEDIUM: 1.1,
+            uis.LARGE: 0.8
+        }
+        return scale_map.get(ui_scale, 1.0)
+    
+    @classmethod
+    def create_window(cls, source, extra_scale=0.0, **kwargs):
+        center = source.get_screen_space_center() if source else None
+        window = cw(
+            **kwargs,
+            scale=cls.get_ui_scale() + extra_scale,
+            transition='in_scale',
+            color=(0.05, 0.05, 0.05),
+            parent=gsw('overlay_stack'),
+            scale_origin_stack_offset=center
+        )
+        return window
+    
+    @staticmethod
+    def close_window(window=None):
+        gs('swish').play()
+        if window:
+            cw(window, transition='out_scale')
+    
+    def __init__(s, source):
+        global convert_mode
+        s.window = s.create_window(
+            source=source,
+            size=(850, 450),
+            extra_scale=0.2
+        )
+        
+        # دکمه بستن
+        AR.add_close_button(s.window, position=(830, 420))
+        
+        # Title با یونیکد زیبا
+        tw(
+            parent=s.window,
+            text=u'\ue010 Text Converter Pro',
+            position=(425, 420),
+            h_align='center',
+            scale=1.5,
+            color=(0, 1, 1)
+        )
+
+        tw(
+            parent=s.window,
+            text=u'\ue025 CONVERSION CONTROLS',
+            position=(180, 375),
+            h_align='center',
+            scale=1.0,
+            color=(1, 1, 0)
+        )
+        
+        # Mode selection
+        mode_y = 320
+        s.p2f_btn = bw(
+            parent=s.window,
+            label=u'\ue027 Persian → Finglish',
+            size=(380, 40),
+            position=(25, mode_y),
+            on_activate_call=Call(s.set_conversion_mode, 1),
+            textcolor=(1, 1, 1),
+            enable_sound=True,
+            button_type='square',
+            color=(0.2, 0.5, 0.2) if convert_mode == 1 else (0.3, 0.3, 0.4)
+        )
+        
+        s.f2p_btn = bw(
+            parent=s.window,
+            label=u'\ue026 Finglish → Persian',
+            size=(380, 40),
+            position=(25, mode_y - 45),
+            on_activate_call=Call(s.set_conversion_mode, 2),
+            textcolor=(1, 1, 1),
+            enable_sound=True,
+            button_type='square',
+            color=(0.2, 0.5, 0.2) if convert_mode == 2 else (0.3, 0.3, 0.4)
+        )
+        
+        # دکمه ON/OFF شبیه Auto Message
+        s.off_btn = bw(
+            parent=s.window,
+            label='ON' if convert_mode != 0 else 'OFF',
+            size=(150, 35),
+            position=(140, mode_y - 95),
+            on_activate_call=Call(s.toggle_conversion),
+            textcolor=(1, 1, 1),
+            enable_sound=True,
+            button_type='square',
+            color=(0, 0.45, 0) if convert_mode != 0 else (0.35, 0, 0)
+        )
+        
+        # Manual conversion section
+        tw(
+            parent=s.window,
+            text=u'\ue024 MANUAL CONVERSION:',
+            position=(200, 170),
+            h_align='center',
+            scale=0.9,
+            color=(0.7, 0.7, 1.0)
+        )
+        
+        # فیلد متن بزرگتر
+        tw(
+            parent=s.window,
+            text=u'\ue023 Enter text to convert:',
+            position=(30, 140),
+            scale=0.8,
+            color=(1, 1, 1)
+        )
+        
+        s.text_input = tw(
+            parent=s.window,
+            position=(30, 105),
+            size=(380, 35),
+            editable=True,
+            text='',
+            color=(0.9, 0.9, 0.9),
+            description="Type Persian or Finglish text here..."
+        )
+        
+        # دکمه‌های تبدیل دستی
+        s.convert_p2f_btn = bw(
+            parent=s.window,
+            label=u'\ue027 Convert → Finglish',
+            size=(180, 35),
+            position=(30, 60),
+            on_activate_call=Call(s.manual_convert, 1),
+            textcolor=(1, 1, 1),
+            color=(0.3, 0.6, 0.3)
+        )
+        
+        s.convert_f2p_btn = bw(
+            parent=s.window,
+            label=u'\ue026 Convert → Persian',
+            size=(180, 35),
+            position=(220, 60),
+            on_activate_call=Call(s.manual_convert, 2),
+            textcolor=(1, 1, 1),
+            color=(0.3, 0.5, 0.8)
+        )
+        
+        # دکمه تبدیل کلیپ‌بورد
+        s.clipboard_btn = bw(
+            parent=s.window,
+            label=u'\ue022 Convert Clipboard Text',
+            size=(380, 30),
+            position=(30, 20),
+            on_activate_call=s.convert_clipboard,
+            textcolor=(1, 1, 1),
+            color=(0.6, 0.3, 0.8)
+        )
+        
+        # بخش سمت راست - توضیحات کامل
+        tw(
+            parent=s.window,
+            text=u'\ue020 ABOUT TEXT CONVERTER',
+            position=(580, 375),
+            h_align='center',
+            scale=1.0,
+            color=(1, 1, 0)
+        )
+        
+        # توضیحات کامل
+        description_text = [
+            u"\ue010 REAL-TIME CONVERSION",
+            "• Automatically converts chat messages",
+            "• Works in all game modes", 
+            "• Instant text transformation",
+            "",
+            u"\ue027 PERSIAN TO FINGLISH",
+            "• سلام → salam",
+            "• چطوری → chetori", 
+            "• خداحافظ → khodahafez",
+            "• دوست → doost",
+            "",
+            u"\ue026 FINGLISH TO PERSIAN", 
+            "• salam → سلام",
+            "• chetori → چطوری",
+            "• khodahafez → خداحافظ",
+            "• doost → دوست",
+            "",
+            u"\ue025 SMART FEATURES",
+            "• Intelligent word detection",
+            "• Special vocabulary handling",
+            "• Punctuation conversion",
+            "• Context-aware processing",
+        ]
+        
+        desc_y = 340
+        for line in description_text:
+            if line.startswith(u"\ue010") or line.startswith(u"\ue027") or line.startswith(u"\ue026") or line.startswith(u"\ue025"):
+                color = (0, 1, 1)
+                scale = 0.75
+            elif line.startswith("•"):
+                color = (0.8, 1, 0.8)
+                scale = 0.60
+            else:
+                color = (0.8, 0.8, 1)
+                scale = 0.7
+            
+            tw(
+                parent=s.window,
+                text=line,
+                position=(440, desc_y),
+                scale=scale,
+                color=color,
+                maxwidth=380,
+                h_align='left'
+            )
+            desc_y -= 18 if any(icon in line for icon in [u"\ue010", u"\ue027", u"\ue026", u"\ue025"]) else 15
+        
+        s.update_display()
+        gs('dingSmall').play()
+    
+    def toggle_conversion(s):
+        """Toggle conversion on/off like Auto Message"""
+        global convert_mode
+        if convert_mode == 0:
+            convert_mode = 1
+        else:
+            convert_mode = 0
+        
+        s.update_display()
+        gs('deek').play()
+        
+        mode_names = {0: 'OFF', 1: 'Persian to Finglish', 2: 'Finglish to Persian'}
+        status_color = (0, 1, 0) if convert_mode != 0 else (1, 0.5, 0)
+        push(f"Converter: {mode_names[convert_mode]}", color=status_color)
+    
+    def set_conversion_mode(s, mode):
+        global convert_mode
+        convert_mode = mode
+        s.update_display()
+        gs('click01').play()
+        
+        mode_names = {0: 'OFF', 1: 'Persian to Finglish', 2: 'Finglish to Persian'}
+        status_color = (0, 1, 0) if mode != 0 else (1, 0.5, 0)
+        push(f"Converter: {mode_names[mode]}", color=status_color)
+    
+    def update_display(s):
+        global convert_mode
+        
+        # Update button colors
+        bw(s.p2f_btn, color=(0.2, 0.6, 0.2) if convert_mode == 1 else (0.3, 0.3, 0.4))
+        bw(s.f2p_btn, color=(0.2, 0.6, 0.2) if convert_mode == 2 else (0.3, 0.3, 0.4))
+        
+        # Update ON/OFF button like Auto Message
+        bw(s.off_btn, 
+           label='ON' if convert_mode != 0 else 'OFF',
+           color=(0, 0.45, 0) if convert_mode != 0 else (0.35, 0, 0),
+           textcolor=(0, 0.6, 0) if convert_mode != 0 else (0.5, 0, 0))
+    
+    def manual_convert(s, conversion_type):
+        """تبدیل دستی متن"""
+        try:
+            text = tw(query=s.text_input).strip()
+            if not text:
+                push("Please enter some text!", color=(1, 0.5, 0))
+                return
+            
+            if conversion_type == 1:
+                if not contains_persian(text):
+                    push("Text doesn't contain Persian characters!", color=(1, 0.5, 0))
+                    return
+                converted = convert_persian_to_finglish(text)
+                result_type = "Finglish"
+            else:
+                if not is_finglish(text):
+                    push("Text doesn't appear to be Finglish!", color=(1, 0.5, 0))
+                    return
+                converted = convert_finglish_to_persian(text)
+                result_type = "Persian"
+            
+            push(f"✅ Converted to {result_type}: {converted}", color=(0, 1, 0))
+            
+            try:
+                if CIS():
+                    from babase import clipboard_set_text
+                    clipboard_set_text(converted)
+                    push("📋 Result copied to clipboard!", color=(0, 1, 1))
+            except:
+                pass
+                
+            gs('dingSmallHigh').play()
+            
+        except Exception as e:
+            push(f"❌ Conversion error: {str(e)}", color=(1, 0, 0))
+    
+    def convert_clipboard(s):
+        """تبدیل متن کلیپ‌بورد"""
+        try:
+            if CIS() and CHT():
+                clipboard_text = CGT()
+                if not clipboard_text.strip():
+                    push("📋 Clipboard is empty!", color=(1, 0.5, 0))
+                    return
+                
+                original_preview = clipboard_text[:30] + "..." if len(clipboard_text) > 30 else clipboard_text
+                push(f"📋 Converting: {original_preview}", color=(0.5, 0.8, 1))
+                
+                if contains_persian(clipboard_text):
+                    converted = convert_persian_to_finglish(clipboard_text)
+                    result_type = "Finglish"
+                elif is_finglish(clipboard_text):
+                    converted = convert_finglish_to_persian(clipboard_text)
+                    result_type = "Persian"
+                else:
+                    push("❓ Cannot detect text type in clipboard!", color=(1, 0.5, 0))
+                    return
+                
+                from babase import clipboard_set_text
+                clipboard_set_text(converted)
+                
+                result_preview = converted[:30] + "..." if len(converted) > 30 else converted
+                push(f"✅ Converted to {result_type}: {result_preview}", color=(0, 1, 0))
+                push("📋 Result copied to clipboard!", color=(0, 1, 1))
+                
+                gs('dingSmallHigh').play()
+                
+            else:
+                push("❌ Clipboard not supported on this device!", color=(1, 0.5, 0))
+                
+        except Exception as e:
+            push(f"❌ Clipboard error: {str(e)}", color=(1, 0, 0))
+            
 # متغیر جهانی برای ذخیره سرورها
 saved_servers_global = []
 
@@ -1056,7 +1646,6 @@ class QuickChat:
         push('Messages reset to default', color=(0, 1, 1))
         gs('dingSmallHigh').play()
 
-"""جوین دوباره (اتصال مجدد)"""
 class Reconnect:
     def __init__(s, t):
         w = s.w = AR.cw(
@@ -1075,7 +1664,7 @@ class Reconnect:
             h_align='center',
             color=(0.2, 0.8, 1)
         )
-        
+
         bw(
             parent=w,
             size=(70, 70),
@@ -1084,7 +1673,7 @@ class Reconnect:
             texture=gt('settingsIcon'),
             color=(1, 1, 1)
         )
-        
+
         bw(
             parent=w,
             size=(70, 70),
@@ -1093,7 +1682,7 @@ class Reconnect:
             texture=gt('settingsIcon'),
             color=(1, 1, 1)
         )
-        
+
         tw(
             parent=w,
             text='Join Faster Than Everyone!',
@@ -1110,7 +1699,7 @@ class Reconnect:
             scale=0.6,
             color=(1, 1, 1)
         )
-        
+
         tw(
             parent=w,
             text=f'IP : {server_ip} PORT : {server_port}',
@@ -1139,7 +1728,7 @@ class Reconnect:
             color=(0.2, 0.7, 0.3),
             textcolor=(1, 1, 1)
         )
-        
+
         s.disconnect_btn = bw(
             parent=w,
             label='Disconnect',
@@ -1162,7 +1751,7 @@ class Reconnect:
             text_scale=0.7,
             textcolor=(1, 1, 1)
         )
-        
+
         s.change_server_btn = bw(
             parent=w,
             label='🔧 Manual Connect',
@@ -1182,7 +1771,7 @@ class Reconnect:
             on_value_change_call=s.toggle_auto_reconnect,
             color=(0.3, 0.7, 0.3)
         )
-        
+
         tw(
             parent=w,
             text='Auto Reconnect',
@@ -1190,18 +1779,18 @@ class Reconnect:
             scale=0.7,
             color=(0.8, 1, 0.8)
         )
-        
+
         AR.swish()
-    
+
     def toggle_auto_reconnect(s, value):
         s.auto_reconnect = value
         status = "ON" if value else "OFF"
         push(f'Auto Reconnect {status}', color=(0, 1, 0))
         tw(s.status_text, text=f'Auto {status}', color=(0, 1, 0))
-        
+
         if value:
             teck(5.0, s.auto_reconnect_check)
-    
+
     def auto_reconnect_check(s):
         if s.auto_reconnect and s.w.exists():
             conn_info = get_connection_info()
@@ -1209,7 +1798,7 @@ class Reconnect:
                 tw(s.status_text, text='Auto connecting...', color=(1, 1, 0))
                 s.do_reconnect()
             teck(5.0, s.auto_reconnect_check)
-    
+
     def get_saved_servers(s):
         """Get saved servers from persistent storage"""
         try:
@@ -1220,7 +1809,7 @@ class Reconnect:
             return servers
         except:
             return []
-    
+
     def save_servers(s, servers):
         """Save servers to persistent storage"""
         try:
@@ -1229,11 +1818,11 @@ class Reconnect:
             return True
         except:
             return False
-    
+
     def show_saved_servers(s):
         s.servers_win = AR.cw(source=s.w, size=(700, 500), background=True)
         AR.add_close_button(s.servers_win, position=(700, 450))
-        
+
         tw(
             parent=s.servers_win,
             text='📁 Saved Servers',
@@ -1242,7 +1831,7 @@ class Reconnect:
             h_align='center',
             color=(0.2, 0.8, 1)
         )
-        
+
         bw(
             parent=s.servers_win,
             size=(100, 100),
@@ -1251,7 +1840,7 @@ class Reconnect:
             texture=gt('actionButtons'),
             color=(1, 1, 1)
         )
-        
+
         bw(
             parent=s.servers_win,
             size=(100, 100),
@@ -1260,7 +1849,7 @@ class Reconnect:
             texture=gt('actionButtons'),
             color=(1, 1, 1)
         )
-        
+
         tw(
             parent=s.servers_win,
             text='Add your favorite servers!',
@@ -1269,9 +1858,9 @@ class Reconnect:
             h_align='center',
             color=(1, 1, 0)
         )
-        
+
         saved_servers = s.get_saved_servers()
-        
+
         if not saved_servers:
             tw(
                 parent=s.servers_win,
@@ -1284,10 +1873,10 @@ class Reconnect:
         else:
             scroll = sw(parent=s.servers_win, size=(600, 300), position=(60, 100))
             s.servers_container = cw(parent=scroll, size=(600, len(saved_servers) * 50))
-            
+
             for i, server in enumerate(saved_servers):
                 y_pos = len(saved_servers) * 47 - i * 50 - 30
-                
+
                 bw(
                     parent=s.servers_container,
                     label='',
@@ -1296,7 +1885,7 @@ class Reconnect:
                     color=(0.2, 0.3, 0.4) if i % 2 == 0 else (0.25, 0.35, 0.45),
                     enable_sound=False
                 )
-                
+
                 tw(
                     parent=s.servers_container,
                     text=f"Name : {server['name']}",
@@ -1305,7 +1894,7 @@ class Reconnect:
                     color=(1, 1, 1),
                     h_align='left'
                 )
-                
+
                 tw(
                     parent=s.servers_container,
                     text=f"IP : {server['ip']} PORT : {server['port']}",
@@ -1314,7 +1903,7 @@ class Reconnect:
                     color=(0.8, 0.9, 1),
                     h_align='left'
                 )
-                
+
                 bw(
                     parent=s.servers_container,
                     label='🌐',
@@ -1324,7 +1913,7 @@ class Reconnect:
                     color=(0.3, 0.7, 0.3),
                     text_scale=0.6
                 )
-                
+
                 bw(
                     parent=s.servers_container,
                     label='🗑️',
@@ -1334,7 +1923,7 @@ class Reconnect:
                     color=(0.8, 0.3, 0.3),
                     text_scale=0.6
                 )
-        
+
         bw(
             parent=s.servers_win,
             label='➕ Add New Server',
@@ -1344,42 +1933,42 @@ class Reconnect:
             color=(0.4, 0.7, 0.4),
             text_scale=0.7
         )
-    
+
     def connect_to_saved(s, server):
         try:
             if hasattr(s, 'servers_win') and s.servers_win.exists():
                 s.servers_win.delete()
-            
+
             tw(s.status_text, text='Connecting...', color=(1, 1, 0))
             push(f'Connecting to {server["name"]}...', color=(0, 1, 0))
-            
+
             conn_info = get_connection_info()
             if conn_info:
                 original_disconnect()
                 time.sleep(2)
-            
+
             new_connect_to_party(server['ip'], server['port'])
             tw(s.status_text, text='Connected', color=(0, 1, 0))
             gs('dingSmallHigh').play()
-            
+
         except Exception as e:
             AR.err(f'Connection error: {str(e)}')
             tw(s.status_text, text='Connection failed', color=(1, 0, 0))
-    
+
     def remove_saved_server(s, server):
         saved_servers = s.get_saved_servers()
         saved_servers = [srv for srv in saved_servers if srv['ip'] != server['ip'] or srv['port'] != server['port']]
-        
+
         if s.save_servers(saved_servers):
             push('Server removed', color=(1, 0.5, 0))
             if hasattr(s, 'servers_win') and s.servers_win.exists():
                 s.servers_win.delete()
                 s.show_saved_servers()
-    
+
     def add_new_server(s):
         s.add_win = AR.cw(source=s.w, size=(700, 500), background=True)
         AR.add_close_button(s.add_win, position=(700, 450))
-        
+
         tw(
             parent=s.add_win,
             text='➕ Add New Server',
@@ -1388,7 +1977,7 @@ class Reconnect:
             h_align='center',
             color=(0.2, 0.8, 1)
         )
-        
+
         bw(
             parent=s.add_win,
             size=(100, 100),
@@ -1397,7 +1986,7 @@ class Reconnect:
             texture=gt('storeCharacter'),
             color=(1, 1, 1)
         )
-        
+
         tw(
             parent=s.add_win,
             text='Enter the IP and port of the server and choose a name for it!',
@@ -1406,7 +1995,7 @@ class Reconnect:
             h_align='center',
             color=(1, 1, 0)
         )
-        
+
         tw(
             parent=s.add_win,
             text='Server Name:',
@@ -1422,7 +2011,7 @@ class Reconnect:
             text='New Server',
             color=(0.9, 0.9, 0.9)
         )
-        
+
         tw(
             parent=s.add_win,
             text='Server IP:',
@@ -1438,7 +2027,7 @@ class Reconnect:
             text='127.0.0.1',
             color=(0.9, 0.9, 0.9)
         )
-        
+
         tw(
             parent=s.add_win,
             text='Server Port:',
@@ -1455,7 +2044,7 @@ class Reconnect:
             h_align='center',
             color=(0.9, 0.9, 0.9)
         )
-        
+
         bw(
             parent=s.add_win,
             label='💾 Save',
@@ -1465,42 +2054,42 @@ class Reconnect:
             color=(0.3, 0.7, 0.3),
             text_scale=0.8
         )
-    
+
     def save_new_server(s):
         try:
             name = tw(query=s.name_input).strip()
             ip = tw(query=s.ip_input).strip()
             port_str = tw(query=s.port_input).strip()
-            
+
             if not all([name, ip, port_str]):
                 AR.err('Please fill all fields')
                 return
-            
+
             port = int(port_str)
-            
+
             new_server = {'name': name, 'ip': ip, 'port': port}
             saved_servers = s.get_saved_servers()
-            
+
             if any(srv['ip'] == ip and srv['port'] == port for srv in saved_servers):
                 AR.err('Server already exists')
                 return
-            
+
             saved_servers.append(new_server)
-            
+
             if s.save_servers(saved_servers):
                 push(f'Server "{name}" saved', color=(0, 1, 0))
-                
+
                 if hasattr(s, 'add_win') and s.add_win.exists():
                     s.add_win.delete()
                 if hasattr(s, 'servers_win') and s.servers_win.exists():
                     s.servers_win.delete()
                     s.show_saved_servers()
-                    
+
         except ValueError:
             AR.err('Port must be a number')
         except Exception as e:
             AR.err(f'Error: {str(e)}')
-    
+
     def show_change_server(s):
         s.change_win = AR.cw(source=s.w, size=(700, 500), background=True)
         AR.add_close_button(s.change_win, position=(700, 450))
@@ -1522,7 +2111,7 @@ class Reconnect:
             texture=gt('replayIcon'),
             color=(1, 1, 1)
         )
-        
+
         tw(
             parent=s.change_win,
             text='Edit the IP and port to connect to servers manually!',
@@ -1596,70 +2185,70 @@ class Reconnect:
             color=(0.3, 0.5, 0.8), 
             textcolor=(1, 1, 1)
         )
-    
+
     def test_connection(s):
         try:
             ip = tw(query=s.change_ip).strip()
             port_str = tw(query=s.change_port).strip()
-            
+
             if not ip or not port_str:
                 AR.err('Please enter IP and port')
                 return
-            
+
             port = int(port_str)
-            
+
             tw(s.status_text_change, text='Testing...', color=(1, 1, 0))
-            
+
             teck(1.5, lambda: tw(s.status_text_change, text='Test successful!', color=(0, 1, 0)))
             push('Connection test successful!', color=(0, 1, 0))
-            
+
         except ValueError:
             AR.err('Port must be a number')
         except Exception as e:
             AR.err(f'Test error: {str(e)}')
-    
+
     def connect_manual(s):
         try:
             ip = tw(query=s.change_ip).strip()
             port_str = tw(query=s.change_port).strip()
-            
+
             if not ip or not port_str:
                 AR.err('Please enter IP and port')
                 return
-            
+
             port = int(port_str)
-            
+
             tw(s.status_text_change, text='Connecting...', color=(1, 1, 0))
-            
+
             conn_info = get_connection_info()
             if conn_info:
                 original_disconnect()
                 time.sleep(2)
-            
+
             push(f'Connecting to {ip}:{port}...', color=(0, 1, 1))
             new_connect_to_party(ip, port)
-            
+
             tw(s.status_text_change, text='Connected!', color=(0, 1, 0))
-            
+
             if hasattr(s, 'change_win') and s.change_win.exists():
                 s.change_win.delete()
-            
+
         except ValueError:
             AR.err('Port must be a number')
         except Exception as e:
             AR.err(f'Connection error: {str(e)}')
             tw(s.status_text_change, text='Connection failed', color=(1, 0, 0))
-    
+
     def do_reconnect(s):
         try:
             if server_ip != "127.0.0.1":
                 tw(s.status_text, text='Reconnecting...', color=(1, 1, 0))
-                
+
                 conn_info = get_connection_info()
                 if conn_info:
                     original_disconnect()
                     time.sleep(2)
-                
+
                 push(f'Connecting to {server_ip}:{server_port}...', color=(0, 1, 0))
                 new_connect_to_party(server_ip, server_port)
                 tw(s.status_text, text='Reconnected', color=(0, 1, 0))
@@ -1669,7 +2258,7 @@ class Reconnect:
         except Exception as e:
             AR.err(f'Connection error: {str(e)}')
             tw(s.status_text, text='Connection failed', color=(1, 0, 0))
-    
+
     def do_disconnect(s):
         try:
             conn_info = get_connection_info()
@@ -1682,77 +2271,6 @@ class Reconnect:
                 AR.err('Not connected to any server!')
         except Exception as e:
             AR.err(f'Disconnect error: {str(e)}')
-
-#سرعت بازی            
-class SpeedControl:
-    def __init__(self, source):
-        self._root_widget = bui.containerwidget(
-            parent=bui.get_special_widget('overlay_stack'),
-            size=(1000, 700),
-            scale=0.7,
-            transition='in_scale',
-            color=(0.18, 0.18, 0.18),
-            on_outside_click_call=self.close
-        )
-        
-        # عنوان
-        bui.textwidget(
-            parent=self._root_widget,
-            text='Game speed control',
-            scale=3.0,
-            position=(500, 600),
-            h_align='center',
-            color=(1, 1, 0)
-        )
-        
-        # دکمه‌های حالت‌های سرعت - موقعیت‌ها را اصلاح کردم
-        speed_modes = [
-            ('Ultra Slow (1.0x)', 1.0, (60, 400)),
-            ('Epic (0.7x)', 0.7, (60, 290)),
-            ('Normal (0.5x)', 0.5, (60, 180)),
-            ('Fast  (0.3x)', 0.3, (60, 70))
-        ]
-        
-        for label, speed, pos in speed_modes:
-            bui.buttonwidget(
-                parent=self._root_widget,
-                label=label,
-                size=(900, 120),  # ارتفاع را کمی کاهش دادم
-                position=pos,
-                on_activate_call=lambda s=speed, l=label: self.set_speed(s, l),
-                color=(0.3, 0.5, 0.8),
-                textcolor=(1, 1, 1),
-                text_scale=2.5  # متن را گنده‌تر کردم
-            )
-        
-        # دکمه بستن - موقعیت و اندازه را اصلاح کردم
-        bui.buttonwidget(
-            parent=self._root_widget,
-            label='Close',
-            size=(150, 100),
-            position=(850, 600),
-            on_activate_call=self.close,
-            color=(0.8, 0.2, 0.2),
-            textcolor=(1, 1, 1),
-            text_scale=1.8  # متن دکمه بستن را گنده‌تر کردم
-        )
-    
-    def set_speed(self, speed, label):
-        """Set game speed"""
-        try:
-            activity = bs.get_foreground_host_activity()
-            if activity and hasattr(activity, 'globalsnode'):
-                activity.globalsnode.slow_motion = speed
-                bui.screenmessage(f'Speed mode: {label}', color=(0, 1, 0))
-                bui.getsound('dingSmallHigh').play()
-                self.close()
-            else:
-                bui.screenmessage('Game activity not found!', color=(1, 0, 0))
-        except Exception as e:
-            bui.screenmessage(f'Error setting speed: {str(e)}', color=(1, 0, 0))
-    
-    def close(self):
-        bui.containerwidget(self._root_widget, transition='out_scale')
             
 """Server Information"""
 class ServerInfo:
@@ -2547,11 +3065,15 @@ def var(s,v=None):
 def reset_conf(): cfg = APP.config; [(cfg.pop(c) if c.startswith(pr) else None) for c in cfg.copy()]; cfg.commit()
 
 # پیش‌فرض
+# پیش‌فرض
 for i in range(4): j = f'tune{i}'; v = var(j); var(j,i<3) if v is None else v
 None if var('state') else var('state',1)
 None if var('time') else var('time','0.5')
 None if var('l') else var('l',{})
 None if var('lc') else var('lc',{})
+# اضافه کردن این خط برای performance_mode
+if var('performance_mode') is None:
+    var('performance_mode', 'normal')
 
 # ابزارهای کوچک
 SW = lambda s: strw(s,suppress_warning=True)
@@ -6934,6 +7456,7 @@ class PracticeTools:
                     
         except Exception as e:
             print(f"Error showing floating text: {e}")
+            
 
 # ba_meta require api 9
 # ba_meta export plugin
@@ -6965,6 +7488,17 @@ class byTaha(Plugin):
             )
             bw(b_practicetools, on_activate_call=Call(PracticeTools, b_practicetools))
             
+            # دکمه SingleConverter
+            b_converter = AR.bw(
+                icon=gt('achievementOutline'),
+                position=(self._width-570, self._height-304),
+                parent=self._root_widget,
+                iconscale=0.6,
+                size=(80,25),
+                label='Converter'
+            )
+            bw(b_converter, on_activate_call=Call(AdvancedConvertPanel, b_converter))
+            
             # دکمه Camera Control
             b_camera = AR.bw(
                 icon=gt('tv'),
@@ -6974,7 +7508,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Camera'
             )
-            bw(b_camera, on_activate_call=lambda: camera_control.open_camera_menu(b_camera))
+            bw(b_camera, on_activate_call=lambda: SimpleCamera().open_camera_menu(b_camera))
             
             # دکمه BsRush
             b_bsrush = AR.bw(
@@ -6985,7 +7519,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='BsRush'
             )
-            bw(b_bsrush, on_activate_call=Call(BsRushWindow, source=b_bsrush))
+            bw(b_bsrush, on_activate_call=Call(BsRushWindow, b_bsrush))
             
             # دکمه Reconnect
             reconnect_btn = AR.bw(
@@ -6994,9 +7528,9 @@ class byTaha(Plugin):
                 parent=self._root_widget,
                 iconscale=0.6,
                 size=(80,25),
-                label='Reconnect',
-                on_activate_call=Call(Reconnect, self._root_widget)  
+                label='Reconnect'
             )
+            bw(reconnect_btn, on_activate_call=Call(Reconnect, self._root_widget))
             
             # دکمه Server Info
             b_serverinfo = AR.bw(
@@ -7018,7 +7552,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Ping'
             )
-            bw(b_ping, on_activate_call=Call(PingButton, source=b_ping))
+            bw(b_ping, on_activate_call=Call(PingButton, b_ping))
             
             # دکمه Obscenity (Bahari)
             b_bahari = AR.bw(
@@ -7029,7 +7563,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Obscenity'
             )
-            bw(b_bahari, on_activate_call=Call(Bahari, source=b_bahari))
+            bw(b_bahari, on_activate_call=Call(Bahari, b_bahari))
             
             # دکمه Spam
             b_spam = AR.bw(
@@ -7040,7 +7574,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Spam'
             )
-            bw(b_spam, on_activate_call=Call(Spam, source=b_spam))
+            bw(b_spam, on_activate_call=Call(Spam, b_spam))
             
             # دکمه Quick Chat
             b_quickchat = AR.bw(
@@ -7051,7 +7585,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Quick Chat'
             )
-            bw(b_quickchat, on_activate_call=Call(QuickChat, source=b_quickchat))
+            bw(b_quickchat, on_activate_call=Call(QuickChat, b_quickchat))
             
             # دکمه Calculator
             b_calculator = AR.bw(
@@ -7062,7 +7596,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Calculator'
             )
-            bw(b_calculator, on_activate_call=Call(Calculator, source=b_calculator))
+            bw(b_calculator, on_activate_call=Call(Calculator, b_calculator))
             
             # دکمه Icons
             b_icons = AR.bw(
@@ -7073,7 +7607,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Icons'
             )
-            bw(b_icons, on_activate_call=Call(show_icons_menu, source_widget=b_icons))
+            bw(b_icons, on_activate_call=Call(show_icons_menu, b_icons))
             
             # دکمه UI Color
             b_uicolor = AR.bw(
@@ -7084,7 +7618,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='UI Color'
             )
-            bw(b_uicolor, on_activate_call=Call(UIColorChanger, source=b_uicolor))
+            bw(b_uicolor, on_activate_call=Call(UIColorChanger, b_uicolor))
             
             # دکمه Players Info
             b_playerinfo = AR.bw(
@@ -7095,7 +7629,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Players'
             )
-            bw(b_playerinfo, on_activate_call=Call(PlayerInfo, source=b_playerinfo))
+            bw(b_playerinfo, on_activate_call=Call(PlayerInfo, b_playerinfo))
             
             # دکمه Chat Log
             b_chatlog = AR.bw(
@@ -7106,7 +7640,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Chat Log'
             )
-            bw(b_chatlog, on_activate_call=Call(ChatLog, source=b_chatlog))
+            bw(b_chatlog, on_activate_call=Call(ChatLog, b_chatlog))
             
             # دکمه Font Maker
             b_font = AR.bw(
@@ -7117,7 +7651,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Font Maker'
             )
-            bw(b_font, on_activate_call=Call(FontMaker, source=b_font))
+            bw(b_font, on_activate_call=Call(FontMaker, b_font))
             
             # دکمه Stickers
             b_sticker = AR.bw(
@@ -7128,7 +7662,7 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Stickers'
             )
-            bw(b_sticker, on_activate_call=Call(StickerMenu, source=b_sticker))
+            bw(b_sticker, on_activate_call=Call(StickerMenu, b_sticker))
             
             # دکمه اصلی Auto Message
             b_main = AR.bw(
@@ -7139,13 +7673,38 @@ class byTaha(Plugin):
                 size=(80,25),
                 label='Auto Msg'
             )
-            bw(b_main, on_activate_call=Call(AR, source=b_main))
-            
-            # دکمه خرید حذف شده است
+            bw(b_main, on_activate_call=Call(AR, b_main))
             
             return r
         
         party.PartyWindow.__init__ = e
+        
+        # Patch _add_msg for real-time conversion
+        original_add_msg = party.PartyWindow._add_msg
+
+        def new_add_msg(self, text, *args, **kwargs):
+            global convert_mode
+
+            # Only process messages with colon (chat messages)
+            if ':' in text and len(text.split(': ')) >= 2:
+                parts = text.split(': ', 1)
+                sender = parts[0]
+                message = parts[1]
+
+                if convert_mode == 1 and contains_persian(message):  # Persian to Finglish
+                    converted_message = convert_persian_to_finglish(message)
+                    text = sender + ': ' + converted_message
+                elif convert_mode == 2 and is_finglish(message):  # Finglish to Persian
+                    converted_message = convert_finglish_to_persian(message)
+                    text = sender + ': ' + converted_message
+
+            original_add_msg(self, text, *args, **kwargs)
+
+        party.PartyWindow._add_msg = new_add_msg
+
+        # Welcome message
+        teck(8, Call(push, "⚡BsRush Mod\nTelegram : @BsRush_Mod", color=(0.2, 0.8, 0.2)))
+        
         s.z = []
         teck(5, s.ear)
     
