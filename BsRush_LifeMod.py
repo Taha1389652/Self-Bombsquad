@@ -13,7 +13,7 @@ buttons = [
     {"label": "a chat", "x": -160, "y": 116, "width": 130, "height": 43},
     {"label": "sl a", "x": -160, "y": 149, "width": 130, "height": 43},
     {"label": "bm", "x": -160, "y": 182, "width": 130, "height": 43},
-    {"label": "v", "x": -160, "y": 215, "width": 130, "height": 43},
+    {"label": "f i", "x": -160, "y": 215, "width": 130, "height": 43},
     {"label": "vip$", "x": -160, "y": 248, "width": 130, "height": 43},
     {"label": "k$", "x": -160, "y": 281, "width": 130, "height": 43},
     {"label": "i", "x": -160, "y": 314, "width": 130, "height": 43},
