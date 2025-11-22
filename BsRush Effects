@@ -3,6 +3,12 @@
 # ba_meta description Gives the host player a glowing, shifting aura every second.
 # ba_meta author ChatGPT x KritarthaT
 
+"""
+BsRush Taha Plugin
+A visual effects plugin that gives the host player a glowing, shifting aura with spark, metal, and ice particles every second.
+Features dynamic color changes and light effects for enhanced visual experience.
+"""
+
 import bascenev1 as bs
 import babase
 import random
