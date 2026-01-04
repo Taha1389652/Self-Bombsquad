@@ -1,6 +1,6 @@
 # ba_meta require api 9
 # coding: utf-8
-#کصمادرت اسکی بری کیر تو ناموس اونی که اسکی بره
+#کصمادرت اسکی بری کیر تو ناموس اونی که اسکی بره حتی اگه یک خط باشه کصمادرت حتی یک خط کد رو هم ببینی
 import babase
 import bauiv1 as bui
 import bascenev1 as bs
