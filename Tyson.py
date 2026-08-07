@@ -6,7 +6,7 @@ import bascenev1 as bs
 import bauiv1lib.ingamemenu as ingamemenu
 import math
 
-EXCLUDED_PLAYERS = ["Mma", "BigFire", "Player3", "Player4"]
+EXCLUDED_PLAYERS = ["Mma", "BigFire", "TAHA1387", "Player4"]
 PUNCH_RADIUS = 1.0
 
 class TysonDuelMode:
