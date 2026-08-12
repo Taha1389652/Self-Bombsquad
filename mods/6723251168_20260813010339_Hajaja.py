@@ -1,0 +1,18 @@
+# config.py
+BOT_TOKEN = "8310561953:AAHCarR61w4JlfuZwskUlgIRixkD5ia0g5I"
+API_ID = 32840432
+API_HASH = "8e9fde9f1e0a80f65153322c0e02114d"
+OWNER_ID = 6394203215
+OWNER_USERNAME = "@heyaa1384"
+SELF_COST_PER_MONTH = 30000
+STARS_PRICE = 50000
+DATA_FILE = "database.json"
+
+PAYMENT_INFO = {
+    "card_number": "6037-XXXX-XXXX-XXXX",
+    "card_name": "نام شما",
+    "bank": "بانک"
+}
+
+ADMINS = [6394203215]
+DEBUG_MODE = True
