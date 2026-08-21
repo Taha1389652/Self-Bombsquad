@@ -50,7 +50,6 @@ from typing import TYPE_CHECKING
 
 import babase
 import bascenev1 as bs
-from bascenev1 import builtinassets, stdassets
 from bascenev1lib.gameutils import SharedObjects
 from bascenev1lib.actor.bomb import Bomb, Blast
 from bascenev1lib.actor.spazbot import SpazBot
@@ -72,12 +71,6 @@ BOSS_VULNERABLE_WINDOW: float = 3.1
 BOSS_SPAWN_HEIGHT: float = 3.0
 BOSS_BODY_SCALE: float = 2.5
 BOSS_MESH_SCALE: float = 2.5
-BOSS_INITIAL_MODEL_NAME: str = 'bonesHead'
-BOSS_INITIAL_TEXTURE_NAME: str = 'bonesColor'
-BOSS_APPEARANCE_MESSAGE_COLOR: tuple[float, float, float] = (0.45, 0.95, 1.0)
-BOSS_APPEARANCE_FX_COLOR: tuple[float, float, float] = (0.2, 0.8, 1.0)
-FIRST_PLAYER_SPAWN_POSITION: tuple[float, float, float] = (0.0, 0.0, 1.0)
-INITIAL_PLAYER_SPAWN_DELAY: float = 1.0
 
 # -----------------------------------------------------------------------
 # صداهای اسکلتی
@@ -117,7 +110,7 @@ BOSS_SOUND_BREATHER: tuple[str, ...] = (
     'bones2', 'bones3', 'hiss', 'powerdown01', 'gasp',
 )
 BOSS_SOUND_REGEN: tuple[str, ...] = (
-    'bonesDeath', 'bones3', 'hiss', 'powerdown01', 'gasp',
+    'bonesDeath', 'bones3', 'hiss', 'powerdown01', 'shield_up', 'gasp',
 )
 
 # -----------------------------------------------------------------------
@@ -182,7 +175,6 @@ BOSS_FLOAT_PERIOD: float = 3.0
 BOSS_RESPAWN_DELAY: float = 30.0
 BOSS_AMBIENT_FX_INTERVAL: float = 2.0    # افکتِ محیطی خیلی کم‌تر شد
 BOSS_TARGET_SCAN_INTERVAL: float = 0.3
-BOSS_SPAWN_TARGET_LOCK_TIME: float = 1.4
 BOSS_REGEN_DELAY: float = 13.0
 BOSS_REGEN_INTERVAL: float = 4.0
 BOSS_REGEN_AMOUNT: int = 1
@@ -424,64 +416,6 @@ def _play_boss_sound_burst(
                 delay,
                 bs.CallStrict(_play_boss_sound, candidates, volume, position),
             )
-
-
-def _walk_asset_tree(
-    package_id: str,
-    group_name: str,
-    node: dict[str, Any],
-    kind: str,
-    package_label: str,
-    prefix: str = '',
-) -> list[tuple[str, str]]:
-    entries: list[tuple[str, str]] = []
-    for name in sorted(node):
-        child = node[name]
-        path = f'{prefix}/{name}' if prefix else name
-        if isinstance(child, dict):
-            entries.extend(
-                _walk_asset_tree(
-                    package_id, group_name, child, kind, package_label, path
-                )
-            )
-        elif child == kind:
-            entries.append((
-                f'{package_label}:{path}',
-                f'{package_id}:{group_name}/{path}',
-            ))
-    return entries
-
-
-def _asset_cycle_entries(group_name: str, kind: str) -> list[tuple[str, str]]:
-    entries: list[tuple[str, str]] = []
-    seen_refs: set[str] = set()
-    for package_label, package in (
-        ('std', stdassets),
-        ('builtin', builtinassets),
-    ):
-        try:
-            package_id = package.__asset_package__
-            root = package._TREE[group_name]
-        except Exception:
-            continue
-        for label, ref in _walk_asset_tree(
-            package_id, group_name, root, kind, package_label
-        ):
-            if ref not in seen_refs:
-                entries.append((label, ref))
-                seen_refs.add(ref)
-    return entries
-
-
-def _find_asset_index(
-    entries: Sequence[tuple[str, str]], short_name: str
-) -> int:
-    for i, (label, ref) in enumerate(entries):
-        if label.split(':', 1)[-1] == short_name or ref.endswith(
-            f'/{short_name}'
-        ):
-            return i
-    return 0
 
 
 def chasattr(obj: Any, name: str) -> bool:
@@ -1297,14 +1231,6 @@ class BossActor:
         self._dead = False
         self._spawn_time = bs.time()
         self._assets = assets
-        self._model_entries: list[tuple[str, str]] = assets.get(
-            'boss_model_entries', []
-        )
-        self._texture_entries: list[tuple[str, str]] = assets.get(
-            'boss_texture_entries', []
-        )
-        self._model_index = int(assets.get('boss_model_index', 0))
-        self._texture_index = int(assets.get('boss_texture_index', 0))
         self._attack_timer: bs.Timer | None = None
         self._regen_timer: bs.Timer | None = None
         self._vulnerable_until = 0.0
@@ -1393,7 +1319,7 @@ class BossActor:
             'prop',
             delegate=self,
             attrs={
-                'body': 'sphere',
+                'body': 'crate',
                 'position': (
                     self._base_position[0],
                     self._base_position[1] + BOSS_SPAWN_HEIGHT,
@@ -1557,9 +1483,6 @@ class BossActor:
         # استفاده می‌شه -- دقیقاً مثلِ یک پلیرِ واقعی که همون‌جا
         # ایستاده.
         self._current_target: Any = _FirstTargetActor(BOSS_FIRST_SHOT_TARGET)
-        self._target_scan_locked_until = (
-            self._spawn_time + BOSS_SPAWN_TARGET_LOCK_TIME
-        )
         # نگه‌داشتنِ رفرنسِ قویِ پایتون به هر پرتابه‌ی زنده. بدونِ
         # این لیست، به‌محضِ خروج از تابعِ _attempt_attack هیچ رفرنسِ
         # قوی‌ای به آبجکتِ BossProjectile باقی نمی‌مونه، پایتون
@@ -1608,107 +1531,6 @@ class BossActor:
         # بعدی رو از رویِ فازِ فعلی دوباره محاسبه می‌کنه.
         self._schedule_next_attack()
 
-    def cycle_model(self) -> None:
-        if self._dead or not self.node:
-            return
-        self._show_appearance_change('model', BOSS_INITIAL_MODEL_NAME, 1, 1)
-
-    def cycle_texture(self, step: int = 1) -> None:
-        del step
-        if self._dead or not self.node:
-            return
-        self._show_appearance_change('texture', BOSS_INITIAL_TEXTURE_NAME, 1, 1)
-
-    def _cycle_appearance(self, kind: str, step: int = 1) -> None:
-        if self._dead or not self.node:
-            return
-        entries = (
-            self._model_entries if kind == 'model' else self._texture_entries
-        )
-        if not entries:
-            try:
-                bs.screenmessage(
-                    f'Boss {kind} list is empty.',
-                    color=(1.0, 0.35, 0.25),
-                )
-            except Exception:
-                pass
-            return
-
-        start_index = (
-            self._model_index if kind == 'model' else self._texture_index
-        )
-        step = 1 if step >= 0 else -1
-        index = (start_index + step) % len(entries)
-        for _attempt in range(len(entries)):
-            label, ref = entries[index]
-            try:
-                if kind == 'model':
-                    mesh = bs.getmesh(ref)
-                    self.node.mesh = mesh
-                    self._model_index = index
-                    self._assets['boss_model_index'] = index
-                    self._assets['boss_mesh'] = mesh
-                    self._assets['boss_model_name'] = label
-                else:
-                    texture = bs.gettexture(ref)
-                    self.node.color_texture = texture
-                    self._texture_index = index
-                    self._assets['boss_texture_index'] = index
-                    self._assets['boss_tex'] = texture
-                    self._assets['boss_texture_name'] = label
-            except Exception:
-                index = (index + step) % len(entries)
-                continue
-
-            self._show_appearance_change(kind, label, index + 1, len(entries))
-            return
-
-        try:
-            bs.screenmessage(
-                f'No loadable boss {kind} found.',
-                color=(1.0, 0.35, 0.25),
-            )
-        except Exception:
-            pass
-
-    def _show_appearance_change(
-        self, kind: str, label: str, index: int, total: int
-    ) -> None:
-        display_kind = 'Texture' if kind == 'texture' else 'Model'
-        try:
-            bs.screenmessage(
-                f'Boss {display_kind}: {label} ({index}/{total})',
-                color=BOSS_APPEARANCE_MESSAGE_COLOR,
-            )
-        except Exception:
-            pass
-        if not self.node:
-            return
-        pos = self.node.position
-        try:
-            bs.emitfx(
-                position=pos,
-                velocity=(0.0, 1.2, 0.0),
-                count=10,
-                scale=1.0,
-                spread=0.7,
-                chunk_type='spark',
-            )
-            flash = bs.newnode(
-                'light',
-                attrs={
-                    'position': pos,
-                    'color': BOSS_APPEARANCE_FX_COLOR,
-                    'radius': 1.2,
-                    'height_attenuated': False,
-                },
-            )
-            bs.animate(flash, 'intensity', {0.0: 1.5, 0.22: 0.0})
-            bs.timer(0.25, flash.delete)
-        except Exception:
-            pass
-
     @property
     def _activity(self) -> bs.Activity | None:
         """دسترسیِ امن به activity از رویِ weakref. اگه activity
@@ -1725,17 +1547,22 @@ class BossActor:
     def _animate(self) -> None:
         if self._dead or not self.node:
             return
-
         t = bs.time() - self._spawn_time
 
         # هرچی باس خشمگین‌تر باشه (فازِ بالاتر)، شناوریِ بالا/پایینش
         # هم تندتر و پرتحرک‌تره -- یک نشونه‌ی بصریِ ساده و همیشگی از
         # این‌که باس داره جری‌تر می‌شه، جدا از رنگِ چشم‌ها و نوارِ HP.
+        rage_phase = self._current_phase()
+        float_period = BOSS_FLOAT_PERIOD / (1.0 + rage_phase * 0.35)
+        float_amplitude = BOSS_FLOAT_AMPLITUDE * (1.0 + rage_phase * 0.2)
+
+        float_phase = (t % float_period) / float_period
+        float_offset = math.sin(float_phase * 2.0 * math.pi) * float_amplitude
         base_y = self._base_position[1] + BOSS_SPAWN_HEIGHT
 
         self.node.position = (
             self._base_position[0],
-            base_y,
+            base_y + float_offset,
             self._base_position[2],
         )
         self.node.velocity = (0.0, 0.0, 0.0)
@@ -2237,10 +2064,6 @@ class BossActor:
 
     def _scan_for_target(self) -> None:
         if self._dead or not self.node:
-            return
-        if bs.time() < self._target_scan_locked_until:
-            if not isinstance(self._current_target, _FirstTargetActor):
-                self._current_target = _FirstTargetActor(BOSS_FIRST_SHOT_TARGET)
             return
         activity = self._activity
         if activity is None:
@@ -3231,7 +3054,9 @@ class BossFight(bs.TeamGameActivity[bs.Player, bs.Team]):
 
     @classmethod
     def supports_session_type(cls, sessiontype: type[bs.Session]) -> bool:
-        return issubclass(sessiontype, bs.FreeForAllSession)
+        return issubclass(sessiontype, bs.CoopSession) or issubclass(
+            sessiontype, bs.FreeForAllSession
+        ) or issubclass(sessiontype, bs.DualTeamSession)
 
     def __init__(self, settings: dict) -> None:
         super().__init__(settings)
@@ -3240,50 +3065,22 @@ class BossFight(bs.TeamGameActivity[bs.Player, bs.Team]):
         self._round_time = settings.get('زمانِ راند', 0)
         self._assets: dict[str, Any] = {}
         self._respawn_timers: dict[bs.Player, bs.Timer] = {}
-        self._initial_spawned_players: set[bs.Player] = set()
-        self._initial_spawn_timers: dict[bs.Player, bs.Timer] = {}
-        self._initial_spawn_gate_open_time: float | None = None
 
     def _load_assets(self) -> None:
         # باس: از مِشِ 'bonesHead' با تکسچرِ 'bonesColor' استفاده
         # می‌کنیم (دقیقاً همون کله‌ی اسکلتی که توی اسِست‌های داخلیِ
         # بازی موجوده). اگه به هر دلیلی در دسترس نبود، به مکعبِ بمب
         # و بعدش TNT بازمی‌گرده تا هیچ‌وقت گیم‌مود کرش نکنه.
-        model_entries = [('fixed:bonesHead', BOSS_INITIAL_MODEL_NAME)]
-        texture_entries = [('fixed:bonesColor', BOSS_INITIAL_TEXTURE_NAME)]
-
-        boss_model_index = _find_asset_index(
-            model_entries, BOSS_INITIAL_MODEL_NAME
-        )
-        boss_texture_index = _find_asset_index(
-            texture_entries, BOSS_INITIAL_TEXTURE_NAME
-        )
-
-        boss_mesh = None
         try:
-            boss_mesh = bs.getmesh(BOSS_INITIAL_MODEL_NAME)
+            boss_mesh = bs.getmesh('bonesHead')
+            boss_tex = bs.gettexture('bonesColor')
         except Exception:
-            boss_mesh = None
-        if boss_mesh is None:
-            boss_mesh = bs.getmesh('puck')
-            model_entries = [('legacy:puck', 'puck')]
-            boss_model_index = 0
-
-        boss_tex = None
-        texture_order = [boss_texture_index] + [
-            i for i in range(len(texture_entries)) if i != boss_texture_index
-        ]
-        for i in texture_order:
             try:
-                boss_tex = bs.gettexture(texture_entries[i][1])
-                boss_texture_index = i
-                break
+                boss_mesh = bs.getmesh('bomb')
+                boss_tex = bs.gettexture('bombColor')
             except Exception:
-                continue
-        if boss_tex is None:
-            boss_tex = bs.gettexture('tnt')
-            texture_entries = [('legacy:tnt', 'tnt')]
-            boss_texture_index = 0
+                boss_mesh = bs.getmesh('tnt')
+                boss_tex = bs.gettexture('tnt')
 
         # پرتابه: یک مِشِ کوچیک‌تر و متفاوت (میخِ خاردار/سنبله) که
         # باعث می‌شه پرتابه از خودِ باس بصری متمایز باشه و حسِ
@@ -3298,12 +3095,6 @@ class BossFight(bs.TeamGameActivity[bs.Player, bs.Team]):
         self._assets = {
             'boss_mesh': boss_mesh,
             'boss_tex': boss_tex,
-            'boss_model_entries': model_entries,
-            'boss_texture_entries': texture_entries,
-            'boss_model_index': boss_model_index,
-            'boss_texture_index': boss_texture_index,
-            'boss_model_name': model_entries[boss_model_index][0],
-            'boss_texture_name': texture_entries[boss_texture_index][0],
             'projectile_mesh': proj_mesh,
             'projectile_tex': proj_tex,
         }
@@ -3389,83 +3180,10 @@ class BossFight(bs.TeamGameActivity[bs.Player, bs.Team]):
             except Exception:
                 pass
         self._respawn_timers.clear()
-        for timer in self._initial_spawn_timers.values():
-            try:
-                timer.cancel()
-            except Exception:
-                pass
-        self._initial_spawn_timers.clear()
-        self._initial_spawned_players.clear()
         super().on_expire()
 
     def spawn_player(self, player: bs.Player) -> bs.Actor:
-        if player not in self._initial_spawned_players:
-            if self._initial_spawn_gate_open_time is None:
-                self._initial_spawn_gate_open_time = (
-                    bs.time() + INITIAL_PLAYER_SPAWN_DELAY
-                )
-                self._initial_spawned_players.add(player)
-                spaz = self.spawn_player_spaz(
-                    player, position=FIRST_PLAYER_SPAWN_POSITION
-                )
-                self._connect_appearance_controls(player, spaz)
-                return spaz
-
-            if bs.time() < self._initial_spawn_gate_open_time:
-                self._schedule_delayed_initial_spawn(player)
-                return bs.Actor()
-
-            self._initial_spawned_players.add(player)
-
-        spaz = self.spawn_player_spaz(player)
-        self._connect_appearance_controls(player, spaz)
-        return spaz
-
-    def _schedule_delayed_initial_spawn(self, player: bs.Player) -> None:
-        if player in self._initial_spawn_timers:
-            return
-        gate_time = self._initial_spawn_gate_open_time
-        delay = INITIAL_PLAYER_SPAWN_DELAY
-        if gate_time is not None:
-            delay = max(0.0, gate_time - bs.time())
-        self._initial_spawn_timers[player] = bs.timer(
-            delay,
-            bs.WeakCallStrict(self._spawn_delayed_initial_player, player),
-        )
-
-    def _spawn_delayed_initial_player(self, player: bs.Player) -> None:
-        self._initial_spawn_timers.pop(player, None)
-        if player in self._initial_spawned_players:
-            return
-        if not player:
-            return
-        try:
-            if not player.exists():
-                return
-        except Exception:
-            pass
-        self._initial_spawned_players.add(player)
-        spaz = self.spawn_player_spaz(player)
-        self._connect_appearance_controls(player, spaz)
-
-    def _connect_appearance_controls(
-        self, player: bs.Player, spaz: PlayerSpaz
-    ) -> None:
-        try:
-            player.assigninput(
-                bs.InputType.PUNCH_PRESS,
-                bs.WeakCallStrict(self._on_player_punch_press, spaz),
-            )
-        except Exception:
-            pass
-
-    def _on_player_punch_press(self, spaz: PlayerSpaz) -> None:
-        try:
-            spaz.on_punch_press()
-        except Exception:
-            pass
-        if self._boss is not None:
-            self._boss.cycle_texture(1)
+        return self.spawn_player_spaz(player)
 
     def handlemessage(self, msg: Any) -> Any:
         if isinstance(msg, bs.PlayerDiedMessage):
