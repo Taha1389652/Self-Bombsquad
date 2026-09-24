@@ -2,129 +2,23 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import random
 import math
-import time
+from typing import TYPE_CHECKING, Optional
+
 import babase
 import bascenev1 as bs
-from bascenev1 import _map
-from bascenev1lib.gameutils import SharedObjects
-from bascenev1lib.actor.bomb import Blast, Bomb
 from bascenev1lib.actor.playerspaz import PlayerSpaz
+from bascenev1lib.actor.spaz import Spaz
+from bascenev1lib.actor.bomb import Blast, Bomb
+from bascenev1lib.actor.onscreentimer import OnScreenTimer
+from bascenev1lib.actor.spazbot import SpazBotSet, StickyBot, SpazBot
 from bascenev1lib.actor.scoreboard import Scoreboard
 from bascenev1lib.actor.spazfactory import SpazFactory
-from bascenev1lib.actor.spazbot import SpazBotSet, StickyBot
+from bascenev1lib.gameutils import SharedObjects
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Sequence, Optional
-
-
-# ========== متن‌های داستانی ==========
-BOSS_QUOTES = {
-    'spawn': ["Man arbabe tariki hastam", "Be jahanam khosh amadid", "Rouhetan mahkome be azab ast", "Marg bar zendegan"],
-    'attack': ["Taame marg ra bechashid", "Khakestar khahid shod", "Naboodi hatmiasat", "Jahannam dar entezare shomast"],
-    'spawn_bot': ["Sarbazane jahannam barkhizid", "Anhara dar ham beshkanid", "Janetan ra nabood konid", "Ghtele am aghaz shavad"],
-    'death': ["Man bar migardam", "Nahayat payan nist", "Doobareh khahid did"],
-    'low_health': ["Nazdike ast margetan ra his mikonam", "Akharin nafashetan ra bekeshid", "Payane kar nazdikast"],
-    'rage': ["Kheshme man bi payan ast", "Jahannam azad mishavad", "Tamame nirouyam ra bekar migiram", "Biaid bebinim chi kasi zende mimanad"]
-}
-
-BOT_QUOTES = [
-    "Naboodetan mikonam", "Farar fayde nadarad", "Marg bar shoma",
-    "Jahannam dar entezar ast", "Khakestar khahid shod", "Taame naboodi ra bechashid"
-]
-
-WIN_QUOTES = [
-    "Man pirooz shodam", "Shokaste shoma ghati bod", "Ghodrate man shekast napazir ast", "Hala bebinid chi kasi ghodratmand ast"
-]
-
-LOSE_QUOTES = [
-    "Shekast khordim", "Nirooyam tamam shod", "Dafe bad mibarim", "Baz ham bar migardim"
-]
-
-
-class ScreenMessage:
-    _last_message_time = 0
-    
-    def __init__(self, text: str, sender: str = "Skeleton King", color=(1, 0.3, 0), duration=3.0):
-        current_time = time.time()
-        if current_time - ScreenMessage._last_message_time < 3.0:
-            return
-        ScreenMessage._last_message_time = current_time
-        full_text = f"{sender}: {text}"
-        bs.screenmessage(babase.Lstr(value=full_text), color=color)
-
-
-class FloatingText:
-    _last_quote_time = {}
-    
-    def __init__(self, text: str, node, color=(1, 1, 1), duration=2.0, y_offset=1.5, owner_id=None):
-        self.node = node
-        self.duration = duration
-        
-        if owner_id:
-            now = time.time()
-            if owner_id in FloatingText._last_quote_time and now - FloatingText._last_quote_time[owner_id] < 3.0:
-                return
-            FloatingText._last_quote_time[owner_id] = now
-        
-        try:
-            if not node or not node.exists():
-                return
-            pos = node.position
-            self.text_node = bs.newnode('text',
-                                        attrs={
-                                            'text': text,
-                                            'in_world': True,
-                                            'shadow': 1.0,
-                                            'flatness': 1.0,
-                                            'scale': 0.025,
-                                            'h_align': 'center',
-                                            'color': color,
-                                            'position': (pos[0], pos[1] + y_offset, pos[2])
-                                        })
-            bs.animate(self.text_node, 'scale', {0: 0.02, 0.15: 0.028, duration: 0.02})
-            bs.animate(self.text_node, 'opacity', {0: 0, 0.15: 1, duration: 0})
-            def move_up():
-                if self.text_node and self.text_node.exists():
-                    p = self.text_node.position
-                    self.text_node.position = (p[0], p[1] + 0.02, p[2])
-            self.move_timer = bs.Timer(0.03, move_up, repeat=True)
-            bs.timer(duration, self._cleanup)
-        except Exception:
-            pass
-    
-    def _cleanup(self):
-        if hasattr(self, 'move_timer') and self.move_timer:
-            self.move_timer = None
-        if self.text_node and self.text_node.exists():
-            self.text_node.delete()
-
-
-# بات با کاراکتر B-9000 و رنگ سفید
-class WhiteBot(StickyBot):
-    character = 'B-9000'
-    default_bomb_type = 'impact'
-    color = (1, 1, 1)
-    highlight = (1, 1, 1)
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if hasattr(self, 'node') and self.node:
-            self.node.name = ''
-            self.node.color = (1, 1, 1)
-            self.node.highlight = (1, 1, 1)
-        if random.random() < 0.35 and hasattr(self, 'node') and self.node:
-            quote = random.choice(BOT_QUOTES)
-            bs.timer(0.5, lambda: FloatingText(quote, self.node, color=(1, 1, 1), duration=2.0, y_offset=1.5, owner_id=f"bot_{id(self)}"))
-    
-    def handlemessage(self, msg: Any) -> Any:
-        if isinstance(msg, bs.DieMessage):
-            if random.random() < 0.3 and hasattr(self, 'node') and self.node:
-                quote = random.choice(["Nabood shodam", "Af..."])
-                FloatingText(quote, self.node, color=(0.8, 0.2, 0.2), duration=1.2, y_offset=1.3)
-        return super().handlemessage(msg)
+    from typing import Any, Sequence, Union, Callable
 
 
 class BombDarkMagicEffect:
@@ -223,116 +117,336 @@ class BombDarkMagicEffect:
             self.timer = None
 
 
-# پلیر سفارشی با بمب ایمپکت
-class CustomPlayerSpaz(PlayerSpaz):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.default_bomb_type = 'impact'
-        self.bomb_type = 'impact'
-        self.bomb_type_default = 'impact'
+def chasattr(obj: Any, name: str) -> bool:
+    try:
+        getattr(obj, name)
+        return True
+    except Exception:
+        return False
 
 
-class SkeletonBoss(bs.Actor):
-    def __init__(self, position: Sequence[float] = (0.29, 7.5, -7.5), hitpoints: int = 1000, player_count: int = 0):
+class BlackHole(bs.Actor):
+    def __init__(
+        self,
+        position: Sequence[float] = (0.0, 0.0, 0.0),
+        source_player: bs.Player | None = None,
+        radius: float = 22.0,
+        xspeed: float = 1.8,
+        ssize: float = 0.0,
+    ):
+        super().__init__()
+        self._source_player = source_player
+        shared = SharedObjects.get()
+
+        dev_material = bs.Material()
+        dev_material.add_actions(
+            conditions=('they_have_material', shared.object_material),
+            actions=('modify_part_collision', 'collide', True),
+        )
+        dev_material.add_actions(
+            actions=(
+                ('modify_part_collision', 'physical', False),
+                ('call', 'at_connect', self.kill),
+            )
+        )
+
+        self.node = bs.newnode(
+            'region',
+            delegate=self,
+            attrs={
+                'position': position,
+                'scale': (0, 0, 0),
+                'type': 'sphere',
+                'materials': [dev_material],
+            },
+        )
+
+        bs.animate_array(
+            self.node,
+            'scale',
+            3,
+            {
+                0: (ssize, ssize, ssize),
+                radius / xspeed: (radius / 10, radius / 10, radius / 10),
+            },
+        )
+
+        un_material = bs.Material()
+        un_material.add_actions(
+            actions=('modify_part_collision', 'collide', False)
+        )
+
+        self.visual_node0 = bs.newnode(
+            'prop',
+            owner=self.node,
+            attrs={
+                'body': 'sphere',
+                'mesh': bs.getmesh('shield'),
+                'color_texture': bs.gettexture('black'),
+                'shadow_size': 0,
+                'reflection_scale': [0],
+                'materials': [un_material],
+                'gravity_scale': 0,
+                'density': 0,
+            },
+        )
+        self.visual_node0.is_area_of_interest = True
+
+        mnode = bs.newnode(
+            'math',
+            owner=self.node,
+            attrs={'input1': (0, 0.1, 0), 'operation': 'add'},
+        )
+        self.node.connectattr('position', mnode, 'input2')
+        mnode.connectattr('output', self.visual_node0, 'position')
+
+        bs.animate(
+            self.visual_node0,
+            'mesh_scale',
+            {0: ssize, radius / xspeed: radius / 10},
+        )
+
+        self.visual_node1 = bs.newnode(
+            'shield', owner=self.node, attrs={'color': (8, 8, 8)}
+        )
+        self.node.connectattr('position', self.visual_node1, 'position')
+        bs.animate(
+            self.visual_node1,
+            'radius',
+            {0: ssize * 2.1, radius / xspeed: radius / 10 * 2.1},
+        )
+
+        self.big_light = bs.newnode(
+            'light',
+            owner=self.node,
+            attrs={
+                'position': position,
+                'color': (1.5, 0.2, 0.8),
+                'radius': 0.9,
+                'height_attenuated': False,
+                'intensity': 3.0,
+            }
+        )
+        self.node.connectattr('position', self.big_light, 'position')
+        bs.animate(self.big_light, 'intensity', {0: 0.5, 2.5: 4.0, 3.0: 5.0})
+
+        self._update_timer = bs.Timer(
+            0.016666667, bs.WeakCallStrict(self._update), repeat=True
+        )
+        self._dtimer: bs.Timer | None = None
+
+        self._skid_sound = bs.getsound('gravelSkid')
+        self.snode = bs.newnode(
+            'sound', owner=self.node, attrs={'sound': self._skid_sound}
+        )
+        bs.animate(self.snode, 'volume', {0: 0, radius / xspeed: radius / 5})
+
+    def _update(self):
+        for node in bs.getnodes():
+            if (
+                chasattr(node, 'materials')
+                and chasattr(node, 'position')
+                and SharedObjects.get().object_material in node.materials
+                and not (chasattr(node, 'invincible') and node.invincible)
+            ):
+                drct = (
+                    self.node.position[0] - node.position[0],
+                    self.node.position[1] - node.position[1],
+                    self.node.position[2] - node.position[2],
+                )
+                dstnc = math.sqrt(drct[0] ** 2 + drct[1] ** 2 + drct[2] ** 2)
+                cradius = self.node.scale[0] * 10
+                if dstnc != 0 and dstnc <= cradius:
+                    nv = (drct[0] / dstnc, drct[1] / dstnc, drct[2] / dstnc)
+                    node.handlemessage(
+                        'impulse',
+                        node.position[0],
+                        node.position[1],
+                        node.position[2],
+                        nv[0],
+                        nv[1],
+                        nv[2],
+                        cradius * 2,
+                        0,
+                        0,
+                        0,
+                        nv[0],
+                        nv[1],
+                        nv[2],
+                    )
+
+    def kill(self):
+        node = bs.getcollision().opposingnode
+        spaz = node.getdelegate(PlayerSpaz) or node.getdelegate(SpazBot)
+        if spaz and (
+            spaz.last_player_attacked_by in (None, spaz)
+            or bs.time() - spaz.last_attacked_time >= 4
+        ):
+            spaz.last_attacked_time = bs.time()
+            spaz.last_player_attacked_by = bs.existing(self._source_player)
+            spaz.last_attacked_type = ('explosion', 'dev')
+
+        light = bs.newnode(
+            'light',
+            attrs={
+                'position': node.position,
+                'height_attenuated': False,
+                'color': (1, 0, 0),
+                'intensity': 30,
+                'radius': 1.5,
+            },
+        )
+        bs.animate(light, 'radius', {0: 0, 0.1: 1.5, 0.2: 1.5, 0.3: 0})
+        bs.timer(0.3, light.delete)
+
+        node.handlemessage(bs.DieMessage())
+
+    def handlemessage(self, msg: Any) -> Any:
+        if isinstance(msg, bs.DieMessage):
+            if self.node:
+                if msg.immediate:
+                    self.node.delete()
+                else:
+                    bs.animate(
+                        self.visual_node0,
+                        'mesh_scale',
+                        {
+                            0: self.visual_node0.mesh_scale,
+                            0.1: 0,
+                            0.2: 0.25,
+                            0.3: 0.25,
+                            0.4: 0,
+                        },
+                    )
+                    bs.animate(
+                        self.visual_node1,
+                        'radius',
+                        {
+                            0: self.visual_node1.radius,
+                            0.1: 0,
+                            0.2: 0.5,
+                            0.3: 0.5,
+                            0.4: 0,
+                        },
+                    )
+                    bs.animate(
+                        self.big_light, 'intensity', {0: self.big_light.intensity, 0.1: 0, 0.4: 0}
+                    )
+                    bs.animate(
+                        self.snode, 'volume', {0: self.snode.volume, 0.1: 0}
+                    )
+                    bs.timer(0.4, self.last_breath)
+                    bs.timer(0.4, self.node.delete)
+                self._update_timer = None
+        else:
+            return super().handlemessage(msg)
+        return None
+
+    def last_breath(self):
+        self._dtimer = bs.Timer(
+            0.016666667,
+            bs.CallStrict(
+                bs.emitfx,
+                self.node.position,
+                count=200,
+                spread=8,
+                emit_type='distortion',
+            ),
+            repeat=True,
+        )
+        from bascenev1lib.actor.bomb import Blast
+
+        Blast(
+            position=self.node.position,
+            blast_type='tnt',
+            hit_subtype='tnt',
+            blast_radius=6.0,
+        ).autoretain()
+        bs.timer(1, bs.CallStrict(self.__setattr__, '_dtimer', None))
+
+
+BLACKHOLE_LIFETIME: float = 20.0
+BLACKHOLE_RADIUS: float = 22.0
+BLACKHOLE_XSPEED: float = 1.8
+BLACKHOLE_SSIZE: float = 0.0
+
+
+class UFODiedMessage:
+    def __init__(self, ufo: UFO, killerplayer: bs.Player | None, how: bs.DeathType):
+        self.spazbot = ufo
+        self.killerplayer = killerplayer
+        self.how = how
+
+
+class RoboBot(StickyBot):
+    character = 'B-9000'
+    default_bomb_type = 'land_mine'
+    color = (0, 0, 0)
+    highlight = (3, 3, 3)
+
+
+class MidBossRoboBot(RoboBot):
+    hitpoints = 1000
+    hitpoints_max = 1000
+
+    def handlemessage(self, msg: Any) -> Any:
+        if isinstance(msg, bs.HitMessage):
+            ht = getattr(msg, 'hit_type', '')
+            if str(ht).lower() != 'punch':
+                return None
+        return super().handlemessage(msg)
+
+
+class UFO(bs.Actor):
+    node: bs.Node
+
+    BOMB_GRAVITY: float = 9.8
+
+    def __init__(self, hitpoints: int = 1000):
         super().__init__()
         shared = SharedObjects.get()
 
+        self.update_callback: Callable[[UFO], Any] | None = None
+        activity = self.activity
+        assert isinstance(activity, bs.GameActivity)
+
+        self.platform_material = bs.Material()
+        self.platform_material.add_actions(
+            conditions=('they_have_material', shared.footing_material),
+            actions=('modify_part_collision', 'collide', True))
+        self.ice_material = bs.Material()
+        self.ice_material.add_actions(
+            actions=('modify_part_collision', 'friction', 0.0))
+
+        self._player_pts: list[tuple[bs.Vec3, bs.Vec3]] = []
+        self._ufo_update_timer: bs.Timer | None = None
+        self.last_player_attacked_by: bs.Player | None = None
+        self.last_attacked_time = 0.0
+        self.last_attacked_type: tuple[str, str] | None = None
+
+        self.to_target: bs.Vec3 = bs.Vec3(0, 0, 0)
+        self.dist = (0, 0, 0)
+
+        self._bots = SpazBotSet()
+        self.frozen = False
+        self.bot_count = 3
+
         self.hitpoints = hitpoints
         self.hitpoints_max = hitpoints
-        self.position = position
-        self.attack_timer: Optional[bs.Timer] = None
-        self.update_timer: Optional[bs.Timer] = None
-        self.bot_timer: Optional[bs.Timer] = None
-        self.effects_timer: Optional[bs.Timer] = None
-        self.talk_timer: Optional[bs.Timer] = None
-        self.is_alive = True
-        self._player_pts: list[tuple[bs.Vec3, bs.Vec3]] | None = None
-        self._low_health_triggered = False
         self._rage_mode = False
-        self._rage_effect_timer: Optional[bs.Timer] = None
-        self._player_count = max(1, player_count)
-        self._rage_active = False
-        
-        self._bots = SpazBotSet()
-        # محاسبه تعداد بات: بر اساس تعداد بازیکنان (حداقل 2، حداکثر 6)
-        self.bot_count = max(2, min(6, self._player_count + 1))
-        self._spawn_points = []
+        self._low_health_triggered = False
+        self._dead = False
+        self._mid_health_triggered = False
 
-        self.boss_material = bs.Material()
-        self.boss_material.add_actions(
-            conditions=('they_have_material', shared.player_material),
-            actions=(('modify_node_collision', 'collide', True),
-                     ('modify_part_collision', 'physical', True)))
-
-        self.node = bs.newnode('prop',
-                               delegate=self,
-                               attrs={
-                                   'position': position,
-                                   'mesh': bs.getmesh('bonesHead'),
-                                   'color_texture': bs.gettexture('bonesColor'),
-                                   'mesh_scale': 5.7,
-                                   'body': 'sphere',
-                                   'body_scale': 4.0,
-                                   'gravity_scale': 0.0,
-                                   'velocity': (0, 0, 0),
-                                   'damping': 999999,
-                                   'density': 999999,
-                                   'shadow_size': 0.8,
-                                   'reflection': 'soft',
-                                   'reflection_scale': [0.2],
-                                   'is_area_of_interest': True,
-                                   'materials': [self.boss_material, shared.object_material, shared.footing_material]
-                               })
-
-        self.boss_name_shadow = bs.newnode('text',
-                                           owner=self.node,
-                                           attrs={
-                                               'text': 'SKELETON KING',
-                                               'in_world': True,
-                                               'shadow': 1.0,
-                                               'flatness': 1.0,
-                                               'scale': 0.03,
-                                               'h_align': 'center',
-                                               'color': (0, 0, 0),
-                                               'position': (position[0], position[1] + 1.8, position[2])
-                                           })
-
-        self.boss_name_text = bs.newnode('text',
-                                         owner=self.node,
-                                         attrs={
-                                             'text': 'SKELETON KING',
-                                             'in_world': True,
-                                             'shadow': 1.0,
-                                             'flatness': 1.0,
-                                             'scale': 0.03,
-                                             'h_align': 'center',
-                                             'color': (1, 0.2, 0.2),
-                                             'position': (position[0], position[1] + 1.85, position[2])
-                                         })
-
-        def animate_boss_color():
-            if self.boss_name_text and self.boss_name_text.exists():
-                colors = [(1, 0.2, 0.2), (1, 0.5, 0), (1, 0.8, 0), (1, 0.5, 0)]
-                for i, col in enumerate(colors):
-                    bs.timer(i * 0.3, lambda c=col: self._set_boss_color(c))
-        self._boss_color_timer = bs.Timer(0.3, animate_boss_color, repeat=True)
-
-        def update_text_position():
-            if self.node and self.node.exists() and self.boss_name_text and self.boss_name_shadow:
-                pos = self.node.position
-                self.boss_name_shadow.position = (pos[0], pos[1] + 1.8, pos[2])
-                self.boss_name_text.position = (pos[0], pos[1] + 1.85, pos[2])
-        self.position_update_timer = bs.Timer(0.05, update_text_position, repeat=True)
-
-        def lock_position():
-            if self.node and self.node.exists() and self.is_alive:
-                self.node.position = self.position
-                self.node.velocity = (0, 0, 0)
-        self.position_lock = bs.Timer(0.1, lock_position, repeat=True)
+        self._mid_boss_bot: Optional[SpazBot] = None
+        self._mid_boss_ready: bool = False
+        self._remaining_hp: int = 0
+        self._mid_boss_ui_timer: Optional[bs.Timer] = None
+        self._mid_boss_killed: bool = False
 
         self._width = 240
         self._width_max = 240
-        self._height = 55
+        self._height = 35
         self._bar_width = 240
         self._bar_height = 35
         self._bar_tex = self._backing_tex = bs.gettexture('bar')
@@ -340,313 +454,369 @@ class SkeletonBoss(bs.Actor):
         self._mesh = bs.getmesh('meterTransparent')
         self.bar_posx = -120
 
-        self._backing = bs.NodeActor(
-            bs.newnode('image', attrs={
-                'position': (self.bar_posx + self._width / 2, -100),
-                'scale': (self._width, self._height),
-                'opacity': 0.7,
-                'color': (0.3, 0.3, 0.3),
-                'vr_depth': -3,
-                'attach': 'topCenter',
-                'texture': self._backing_tex
-            }))
+        self._last_hit_time: int | None = None
+        self.impact_scale = 1.0
+        self._num_times_hit = 0
 
-        self._bar = bs.NodeActor(
-            bs.newnode('image', attrs={
-                'opacity': 1.0,
-                'color': (0.8, 0.2, 0.2),
-                'attach': 'topCenter',
-                'texture': self._bar_tex
-            }))
+        self._sucker_mat = bs.Material()
 
-        self._bar_scale = bs.newnode('combine', owner=self._bar.node, attrs={'size': 2, 'input0': self._bar_width, 'input1': self._bar_height})
-        self._bar_scale.connectattr('output', self._bar.node, 'scale')
+        self.ufo_material = bs.Material()
+        self.ufo_material.add_actions(
+            conditions=('they_have_material', shared.player_material),
+            actions=(('modify_node_collision', 'collide', True),
+                     ('modify_part_collision', 'physical', True)))
 
-        self._bar_position = bs.newnode('combine', owner=self._bar.node, attrs={'size': 2, 'input0': self.bar_posx + self._bar_width / 2, 'input1': -100})
-        self._bar_position.connectattr('output', self._bar.node, 'position')
+        self.ufo_material.add_actions(
+            conditions=(('they_have_material', shared.object_material), 'or',
+                        ('they_have_material', shared.footing_material), 'or',
+                        ('they_have_material', self.ufo_material)),
+            actions=('modify_part_collision', 'physical', False))
 
-        self._cover = bs.NodeActor(
-            bs.newnode('image', attrs={
-                'position': (self.bar_posx + 120, -100),
-                'scale': (self._width * 1.15, self._height * 1.6),
-                'opacity': 1.0,
-                'color': (0.3, 0.3, 0.3),
-                'vr_depth': 2,
-                'attach': 'topCenter',
-                'texture': self._cover_tex,
-                'mesh_transparent': self._mesh
-            }))
+        activity = bs.getactivity()
+        point = activity.map.get_flag_position(None)
+        boss_spawn_pos = (point[0], point[1] + 3.5, point[2])
 
-        self._title_text = bs.NodeActor(
-            bs.newnode('text', attrs={
-                'position': (self.bar_posx + 120, -80),
-                'h_attach': 'center',
-                'v_attach': 'top',
-                'h_align': 'center',
-                'v_align': 'center',
-                'maxwidth': 130,
-                'scale': 0.65,
-                'text': 'SKELETON KING',
-                'shadow': 0.5,
-                'flatness': 1.0,
-                'color': (1, 0.5, 0, 0.9)
-            }))
+        self.node = bs.newnode('prop', delegate=self, attrs={
+            'position': boss_spawn_pos,
+            'velocity': (2, 0, 0),
+            'color_texture': bs.gettexture('achievementFootballShutout'),
+            'mesh': bs.getmesh('landMine'),
+            'mesh_scale': 3.3,
+            'body': 'landMine',
+            'body_scale': 3.3,
+            'gravity_scale': 0.2,
+            'density': 1,
+            'reflection': 'soft',
+            'reflection_scale': [0.25],
+            'shadow_size': 0.1,
+            'max_speed': 1.5,
+            'is_area_of_interest': True,
+            'materials': [shared.footing_material, shared.object_material]})
 
-        self._score_text = bs.NodeActor(
-            bs.newnode('text', attrs={
-                'position': (self.bar_posx + 120, -105),
-                'h_attach': 'center',
-                'v_attach': 'top',
-                'h_align': 'center',
-                'v_align': 'center',
-                'maxwidth': 130,
-                'scale': 0.9,
-                'text': str(self.hitpoints),
-                'shadow': 0.5,
-                'flatness': 1.0,
-                'color': (1, 1, 1, 0.8)
-            }))
+        self.holder = bs.newnode('region', attrs={
+            'position': (boss_spawn_pos[0], boss_spawn_pos[1] - 0.25, boss_spawn_pos[2]),
+            'scale': [6, 0.1, 2.5 - 0.1],
+            'type': 'box',
+            'materials': (self.platform_material, self.ice_material, shared.object_material)})
 
-        bs.timer(1.0, self._say_spawn_quote)
-        self.start_attacking()
-        self.start_update()
-        self.start_player_tracking()
-        self.collect_spawn_points()
-        self.start_spawning_bots()
-        self.start_effects()
-        self.start_talking()
-    
-    def _set_boss_color(self, color):
-        if self.boss_name_text and self.boss_name_text.exists():
-            self.boss_name_text.color = color
-    
-    def _create_rage_effect(self):
+        self.blocks = []
+
+        self._sucker_mat.add_actions(
+            conditions=(('they_have_material', shared.player_material)),
+            actions=(('modify_part_collision', 'collide', True),
+                     ('modify_part_collision', 'physical', False),
+                     ('call', 'at_connect', self._levitate)))
+
+        self.suck = bs.newnode('region',
+                               attrs={'position': (boss_spawn_pos[0], boss_spawn_pos[1] - 2, boss_spawn_pos[2]),
+                                      'scale': [1, 10, 1],
+                                      'type': 'box',
+                                      'materials': [self._sucker_mat]})
+
+        self.node.connectattr('position', self.holder, 'position')
+        self.node.connectattr('position', self.suck, 'position')
+
+        bs.animate(self.node, 'mesh_scale', {
+            0: 0,
+            0.2: self.node.mesh_scale * 1.1,
+            0.26: self.node.mesh_scale})
+
+        self.shield_deco = bs.newnode('shield', owner=self.node,
+                                      attrs={'color': (4, 4, 4), 'radius': 1.2})
+        self.node.connectattr('position', self.shield_deco, 'position')
+
+        self._scoreboard()
+        self._update()
+        self.drop_bomb_timer = bs.Timer(1.5, bs.CallStrict(self._drop_bomb), repeat=True)
+        self.drop_bots_timer = bs.Timer(15.0, bs.CallStrict(self._drop_bots), repeat=True)
+        self._move_timer = bs.Timer(0.05, bs.WeakCallStrict(self.update_ai), repeat=True)
+
+    def _sync_mid_boss_hp(self) -> None:
+        bot = self._mid_boss_bot
+        if bot is None:
+            return
+        try:
+            hp = int(getattr(bot, 'hitpoints', 0))
+            hp_max = int(getattr(bot, 'hitpoints_max', 1)) or 1
+        except Exception:
+            return
+
+        if hp < 0:
+            hp = 0
+
+        self.hitpoints = hp
+        self.hitpoints_max = hp_max
+
+        try:
+            if (self._score_text and self._score_text.node
+                    and self._score_text.node.exists()):
+                self._score_text.node.text = str(hp)
+        except Exception:
+            pass
+
+        try:
+            self._bar_width = hp * self._width_max / hp_max
+            if self._bar_scale:
+                cur_width = self._bar_scale.input0
+                bs.animate(self._bar_scale, 'input0',
+                           {0.0: cur_width, 0.1: self._bar_width})
+            if self._bar_position:
+                cur_x = self._bar_position.input0
+                bs.animate(self._bar_position, 'input0',
+                           {0.0: cur_x, 0.1: self.bar_posx + self._bar_width / 2})
+        except Exception:
+            pass
+
+        hp_percent = hp / hp_max if hp_max else 0
+        try:
+            if self._bar:
+                if hp_percent <= 0.25:
+                    self._bar.node.color = (1, 0.1, 0.1)
+                elif hp_percent <= 0.5:
+                    self._bar.node.color = (1, 0.6, 0.1)
+                else:
+                    self._bar.node.color = (0.5, 0.5, 0.5)
+        except Exception:
+            pass
+
+        if hp <= 0 and not self._mid_boss_killed:
+            self._mid_boss_killed = True
+            try:
+                if bot.node and bot.node.exists():
+                    bot.handlemessage(bs.DieMessage())
+            except Exception:
+                pass
+
+    def _drop_bots(self) -> None:
         if not self.node or not self.node.exists():
             return
-        
         pos = self.node.position
-        
-        for _ in range(12):
-            angle = random.uniform(0, 2 * math.pi)
-            rad = random.uniform(2.5, 5.0)
-            x = pos[0] + math.cos(angle) * rad
-            z = pos[2] + math.sin(angle) * rad
-            
-            tex = bs.gettexture('impactBombColor')
-            mesh = bs.getmesh('impactBomb')
-            
-            node = bs.newnode('prop',
-                attrs={
-                    'body': 'sphere',
-                    'position': (x, pos[1] + random.uniform(0.5, 4.0), z),
-                    'velocity': (random.uniform(-3, 3), random.uniform(4, 10), random.uniform(-3, 3)),
-                    'mesh': mesh,
-                    'mesh_scale': 0.6,
-                    'body_scale': 0.0,
-                    'shadow_size': 0.0,
-                    'gravity_scale': 0.12,
-                    'color_texture': tex,
-                    'reflection': 'soft',
-                    'reflection_scale': [0.0]
-                })
-            
-            light = bs.newnode('light',
-                owner=node,
-                attrs={
-                    'intensity': 2.0,
-                    'color': (1.5, 0.4, 1.5),
-                    'radius': 0.28
-                })
-            node.connectattr('position', light, 'position')
-            
-            node2 = bs.newnode('prop',
-                attrs={
-                    'body': 'sphere',
-                    'position': (x + random.uniform(-1.0, 1.0), 
-                                pos[1] + random.uniform(0.5, 3.5), 
-                                z + random.uniform(-1.0, 1.0)),
-                    'velocity': (random.uniform(-2.5, 2.5), random.uniform(3, 8), random.uniform(-2.5, 2.5)),
-                    'mesh': mesh,
-                    'mesh_scale': 0.4,
-                    'body_scale': 0.0,
-                    'shadow_size': 0.0,
-                    'gravity_scale': 0.18,
-                    'color_texture': tex,
-                    'reflection': 'soft',
-                    'reflection_scale': [0.0]
-                })
-            
-            light2 = bs.newnode('light',
-                owner=node2,
-                attrs={
-                    'intensity': 1.3,
-                    'color': (1.2, 0.3, 1.2),
-                    'radius': 0.16
-                })
-            node2.connectattr('position', light2, 'position')
-            
-            bs.timer(1.0, node.delete)
-            bs.timer(1.0, node2.delete)
-    
-    def _activate_rage_mode(self):
-        if self._rage_mode:
-            return
-        self._rage_mode = True
-        quote = random.choice(BOSS_QUOTES['rage'])
-        ScreenMessage(quote, "Skeleton King", color=(1, 0.2, 0), duration=3.0)
-        self._bar.node.color = (1, 0.1, 0.1)
-        
-        # افزایش تعداد بات در حالت خشم
-        self.bot_count = min(6, self.bot_count + 1)
-        
-        def rage_effect():
-            if self._rage_mode and self.is_alive:
-                self._create_rage_effect()
-        
-        self._rage_effect_timer = bs.Timer(0.2, rage_effect, repeat=True)
-        self._play_rage_sound()
-    
-    def _remove_rage_effect(self):
-        if self._rage_effect_timer:
-            self._rage_effect_timer = None
-    
-    def _play_rage_sound(self):
+        for i in range(self.bot_count):
+            bs.timer(1.0 + i, lambda p=pos: self._bots.spawn_bot(
+                RoboBot, pos=(p[0], p[1] - 1, p[2]), spawn_time=0.0))
+
+    def _skullify_bomb(self, bomb):
         try:
-            sound = bs.getsound('metalHit')
-            sound.play(position=self.node.position, volume=1.0)
-        except:
+            if bomb.node and bomb.node.exists():
+                bomb.node.mesh = bs.getmesh('bonesHead')
+                bomb.node.color_texture = bs.gettexture('bonesColor')
+                bomb.node.mesh_scale = 1.15
+        except Exception:
             pass
-    
-    def _say_spawn_quote(self):
-        if self.is_alive:
-            quote = random.choice(BOSS_QUOTES['spawn'])
-            ScreenMessage(quote, "Skeleton King", color=(1, 0.3, 0), duration=3.0)
-    
-    def _say_attack_quote(self):
-        if self.is_alive and random.random() < 0.4:
-            if self._rage_mode:
-                quote = random.choice(BOSS_QUOTES['rage'])
-            else:
-                quote = random.choice(BOSS_QUOTES['attack'])
-            ScreenMessage(quote, "Skeleton King", color=(1, 0.5, 0), duration=2.5)
-    
-    def _say_spawn_bot_quote(self):
-        if self.is_alive:
-            quote = random.choice(BOSS_QUOTES['spawn_bot'])
-            ScreenMessage(quote, "Skeleton King", color=(1, 0.3, 0), duration=2.5)
-    
-    def _say_low_health_quote(self):
-        if self.is_alive and not self._low_health_triggered:
-            self._low_health_triggered = True
-            quote = random.choice(BOSS_QUOTES['low_health'])
-            ScreenMessage(quote, "Skeleton King", color=(1, 0.2, 0), duration=3.0)
-    
-    def _say_win_quote(self):
-        quote = random.choice(WIN_QUOTES)
-        ScreenMessage(quote, "Skeleton King", color=(1, 0.5, 0), duration=3.0)
-    
-    def _say_lose_quote(self):
-        quote = random.choice(LOSE_QUOTES)
-        ScreenMessage(quote, "Skeleton King", color=(1, 0.2, 0.2), duration=3.0)
-    
-    def start_talking(self):
-        def say_random_quote():
-            if self.is_alive and self.node and self.node.exists():
-                if self._rage_mode:
-                    quote = random.choice(BOSS_QUOTES['rage'])
-                else:
-                    quote = random.choice(BOSS_QUOTES['attack'])
-                ScreenMessage(quote, "Skeleton King", color=(1, 0.4, 0), duration=2.5)
-        self.talk_timer = bs.Timer(10.0, say_random_quote, repeat=True)
 
-    def collect_spawn_points(self):
-        activity = bs.getactivity()
-        if activity and hasattr(activity.map, 'defs'):
-            map_defs = activity.map.defs
-            if hasattr(map_defs, 'points'):
-                for key, value in map_defs.points.items():
-                    if key.startswith('spawn') or key.startswith('ffa_spawn'):
-                        if len(value) >= 3:
-                            pos = (value[0], value[1], value[2])
-                            if pos not in self._spawn_points:
-                                self._spawn_points.append(pos)
-        
-        if len(self._spawn_points) == 0:
-            self._spawn_points = [
-                (-4.745706238, 5.051501304, -4.247934288),
-                (5.838590388, 5.051501304, -4.259627405),
-                (0.5006944438, 5.051501304, -5.79356326),
-                (0.5006944438, 5.051501304, -2.435321368),
-                (7.941690444946289, -4.203672409057617, -10.778594017028809),
-                (-7.941690444946289, -4.203672409057617, -10.778594017028809)
-            ]
-
-    def start_player_tracking(self):
-        self.player_track_timer = bs.Timer(0.1, self._update_player_points, repeat=True)
-
-    def _update_player_points(self):
-        activity = bs.getactivity()
-        if not activity or not self.is_alive:
+    def _launch_skull_bomb(self, origin_pos, aim_point: bs.Vec3, target_vel: bs.Vec3 | None = None):
+        if not self.node or not self.node.exists():
             return
-        player_pts = []
-        for player in activity.players:
-            if player.is_alive() and player.actor and player.actor.node:
-                player_pts.append((
-                    bs.Vec3(player.actor.node.position),
-                    bs.Vec3(player.actor.node.velocity)
-                ))
-        self._player_pts = player_pts
 
-    def _get_closest_player(self):
-        if not self.node or not self._player_pts:
-            return None, None
+        start = bs.Vec3(origin_pos[0], origin_pos[1] - 1.0, origin_pos[2])
+        horiz_dist = math.sqrt((aim_point.x - start.x) ** 2 + (aim_point.z - start.z) ** 2)
+
+        desired_speed = 15.0 if self._rage_mode else 11.0
+        flight_time = max(0.35, horiz_dist / desired_speed)
+
+        target = aim_point
+        if target_vel is not None:
+            lead = 0.5
+            target = bs.Vec3(
+                aim_point.x + target_vel.x * flight_time * lead,
+                aim_point.y,
+                aim_point.z + target_vel.z * flight_time * lead,
+            )
+
+        dx = target.x - start.x
+        dy = target.y - start.y
+        dz = target.z - start.z
+
+        vx = dx / flight_time
+        vz = dz / flight_time
+        vy = (dy + 0.5 * self.BOMB_GRAVITY * flight_time ** 2) / flight_time
+
+        bomb_pos = (
+            start.x + random.uniform(-0.2, 0.2),
+            start.y,
+            start.z + random.uniform(-0.2, 0.2),
+        )
+        bomb_vel = (vx, vy, vz)
+        bomb = Bomb(position=bomb_pos, velocity=bomb_vel, bomb_type='impact')
+        bomb.autoretain()
+        self._skullify_bomb(bomb)
+        dark_effect = BombDarkMagicEffect(bomb.node)
+        dark_effect.start()
+        bs.emitfx(position=bomb_pos, count=10, scale=1.2, spread=0.5, chunk_type='spark')
+
+    def _drop_bomb(self) -> None:
+        if not self.node or not self.node.exists() or self.frozen or self._dead:
+            return
+        target_pt, target_vel = self._get_target_player_pt()
+        if target_pt is None:
+            return
+        p = self.node.position
+        bomb_count = 2 if self._rage_mode else 1
+        spread = 0.8 if self._rage_mode else 0.4
+        for i in range(bomb_count):
+            offset = (i - (bomb_count - 1) / 2) * spread
+            aim_point = bs.Vec3(target_pt.x + offset, target_pt.y, target_pt.z + offset)
+            bs.timer(i * 0.12, bs.CallPartial(self._launch_skull_bomb, p, aim_point, target_vel))
+
+    def _levitate(self):
+        node = bs.getcollision().opposingnode
+        if node.exists():
+            spaz = node.getdelegate(Spaz, True)
+
+            def raise_player(target_spaz):
+                if target_spaz and target_spaz.node and target_spaz.node.exists():
+                    node = target_spaz.node
+                    try:
+                        node.handlemessage("impulse", node.position[0],
+                                           node.position[1] + .5,
+                                           node.position[2], 0, 5, 0, 3, 10, 0,
+                                           0, 0, 5, 0)
+                    except Exception:
+                        pass
+
+            if not self.frozen:
+                for i in range(7):
+                    bs.timer(0.05 + i / 20, bs.CallPartial(raise_player, spaz))
+
+    def on_punched(self, damage: int) -> None:
+        pass
+
+    def do_damage(self, msg: Any) -> None:
+        if not self.node or self._dead:
+            return None
+        damage = abs(msg.magnitude)
+        if msg.hit_type == 'explosion':
+            damage /= 20
+        self.hitpoints -= int(damage)
+        if self.hitpoints <= 0:
+            self.handlemessage(bs.DieMessage())
+        self._update()
+
+    def _get_target_player_pt(self) -> tuple[bs.Vec3 | None, bs.Vec3 | None]:
+        assert self.node
         botpt = bs.Vec3(self.node.position)
-        closest_dist = None
-        closest_pt = None
-        for plpt, _ in self._player_pts:
+        closest_dist: float | None = None
+        closest_vel: bs.Vec3 | None = None
+        closest: bs.Vec3 | None = None
+        if not self._player_pts:
+            return None, None
+        for plpt, plvel in self._player_pts:
             dist = (plpt - botpt).length()
-            if (closest_dist is None or dist < closest_dist) and (plpt[1] > botpt[1] - 5.0):
+            if closest_dist is None or dist < closest_dist:
                 closest_dist = dist
-                closest_pt = plpt
-        return closest_pt, closest_dist
+                closest_vel = plvel
+                closest = plpt
+        if closest_dist is not None:
+            assert closest_vel is not None
+            assert closest is not None
+            return (
+                bs.Vec3(closest[0], closest[1], closest[2]),
+                bs.Vec3(closest_vel[0], closest_vel[1], closest_vel[2]),
+            )
+        return None, None
 
-    def start_attacking(self):
-        self.attack_timer = bs.Timer(self._get_attack_interval(), self.attack, repeat=True)
+    def set_player_points(self, pts: list[tuple[bs.Vec3, bs.Vec3]]) -> None:
+        self._player_pts = pts
 
-    def _get_attack_interval(self):
-        if self._rage_mode:
-            return 1.5
-        return 3.0
+    def exists(self) -> bool:
+        return bool(self.node)
 
-    def start_spawning_bots(self):
-        self.bot_timer = bs.Timer(self._get_spawn_interval(), self._drop_bots, repeat=True)
+    def show_damage_count(self, damage: str, position: Sequence[float], direction: Sequence[float]) -> None:
+        lifespan = 1.0
+        app = bs.app
+        do_big = app.ui_v1.uiscale is bs.UIScale.SMALL or app.vr_mode
+        txtnode = bs.newnode('text',
+                             attrs={
+                                 'text': damage,
+                                 'in_world': True,
+                                 'h_align': 'center',
+                                 'flatness': 1.0,
+                                 'shadow': 1.0 if do_big else 0.7,
+                                 'color': (1, 0.25, 0.25, 1),
+                                 'scale': 0.035 if do_big else 0.03
+                             })
+        tcombine = bs.newnode('combine', owner=txtnode, attrs={'size': 3})
+        tcombine.connectattr('output', txtnode, 'position')
+        v_vals = []
+        pval = 0.0
+        vval = 0.07
+        count = 6
+        for i in range(count):
+            v_vals.append((float(i) / count, pval))
+            pval += vval
+            vval *= 0.5
+        p_start = position[0]
+        p_dir = direction[0]
+        bs.animate(tcombine, 'input0',
+                   {i[0] * lifespan: p_start + p_dir * i[1] for i in v_vals})
+        p_start = position[1]
+        p_dir = direction[1]
+        bs.animate(tcombine, 'input1',
+                   {i[0] * lifespan: p_start + p_dir * i[1] for i in v_vals})
+        p_start = position[2]
+        p_dir = direction[2]
+        bs.animate(tcombine, 'input2',
+                   {i[0] * lifespan: p_start + p_dir * i[1] for i in v_vals})
+        bs.animate(txtnode, 'opacity', {0.7 * lifespan: 1.0, lifespan: 0.0})
+        bs.timer(lifespan, txtnode.delete)
 
-    def _get_spawn_interval(self):
-        if self._rage_mode:
-            return 5.0
-        return 8.0
+    def _scoreboard(self) -> None:
+        self._backing = bs.NodeActor(
+            bs.newnode('image',
+                       attrs={
+                           'position': (self.bar_posx + self._width / 2, -100),
+                           'scale': (self._width, self._height),
+                           'opacity': 0.7,
+                           'color': (0.3, 0.3, 0.3),
+                           'vr_depth': -3,
+                           'attach': 'topCenter',
+                           'texture': self._backing_tex
+                       }))
+        self._bar = bs.NodeActor(
+            bs.newnode('image',
+                       attrs={
+                           'opacity': 1.0,
+                           'color': (0.5, 0.5, 0.5),
+                           'attach': 'topCenter',
+                           'texture': self._bar_tex
+                       }))
+        self._bar_scale = bs.newnode('combine', owner=self._bar.node,
+                                     attrs={'size': 2, 'input0': self._bar_width, 'input1': self._bar_height})
+        self._bar_scale.connectattr('output', self._bar.node, 'scale')
+        self._bar_position = bs.newnode('combine', owner=self._bar.node,
+                                        attrs={'size': 2, 'input0': self.bar_posx + self._bar_width / 2, 'input1': -100})
+        self._bar_position.connectattr('output', self._bar.node, 'position')
+        self._cover = bs.NodeActor(
+            bs.newnode('image',
+                       attrs={
+                           'position': (self.bar_posx + 120, -100),
+                           'scale': (self._width * 1.15, self._height * 1.6),
+                           'opacity': 1.0,
+                           'color': (0.3, 0.3, 0.3),
+                           'vr_depth': 2,
+                           'attach': 'topCenter',
+                           'texture': self._cover_tex,
+                           'mesh_transparent': self._mesh
+                       }))
+        self._score_text = bs.NodeActor(
+            bs.newnode('text',
+                       attrs={
+                           'position': (self.bar_posx + 120, -100),
+                           'h_attach': 'center',
+                           'v_attach': 'top',
+                           'h_align': 'center',
+                           'v_align': 'center',
+                           'maxwidth': 130,
+                           'scale': 0.9,
+                           'text': '',
+                           'shadow': 0.5,
+                           'flatness': 1.0,
+                           'color': (1, 1, 1, 0.8)
+                       }))
 
-    def _drop_bots(self):
-        """اسپاون بات بر اساس تعداد تعیین شده (با توجه به تعداد بازیکنان)"""
-        if not self.is_alive or not self.node or len(self._spawn_points) < self.bot_count:
+    def _update(self) -> None:
+        if self._dead:
             return
-        self._say_spawn_bot_quote()
-        
-        # انتخاب نقاط اسپاون
-        selected = random.sample(self._spawn_points, min(self.bot_count, len(self._spawn_points)))
-        
-        for i, spawn_pos in enumerate(selected):
-            y_pos = spawn_pos[1] + 0.8
-            bs.timer(i * 0.3, lambda pos=spawn_pos, y=y_pos: self._bots.spawn_bot(
-                WhiteBot, pos=(pos[0], y, pos[2]), spawn_time=0.0))
-
-    def start_update(self):
-        self.update_timer = bs.Timer(0.1, self._update_health_bar, repeat=True)
-
-    def _update_health_bar(self):
-        if not self.is_alive:
-            return
-        self.hitpoints = max(0, self.hitpoints)
         self._score_text.node.text = str(self.hitpoints)
         self._bar_width = self.hitpoints * self._width_max / self.hitpoints_max
         cur_width = self._bar_scale.input0
@@ -655,164 +825,401 @@ class SkeletonBoss(bs.Actor):
         bs.animate(self._bar_position, 'input0', {0.0: cur_x, 0.1: self.bar_posx + self._bar_width / 2})
 
         hp_percent = self.hitpoints / self.hitpoints_max
-        
-        if hp_percent <= 0.3 and not self._rage_mode:
-            self._activate_rage_mode()
-            if self.attack_timer:
-                self.attack_timer = None
-            if self.bot_timer:
-                self.bot_timer = None
-            self.start_attacking()
-            self.start_spawning_bots()
-        
-        if hp_percent < 0.2 and not self._low_health_triggered:
-            self._say_low_health_quote()
+
+        if hp_percent <= 0.5 and not self._mid_health_triggered:
+            self._mid_health_triggered = True
+            self._trigger_mid_health_event()
+            return
+
+        if hp_percent <= 0.25 and not self._rage_mode:
+            self._rage_mode = True
+            self._bar.node.color = (1, 0.1, 0.1)
+            bs.camerashake(intensity=2.0)
+            try:
+                self.shield_deco.color = (5, 0.2, 0.2)
+            except:
+                pass
+        elif hp_percent < 0.2 and not self._low_health_triggered:
             self._low_health_triggered = True
+            bs.emitfx(position=self.node.position, count=60, scale=3.0, spread=3.0, chunk_type='spark')
+            bs.camerashake(intensity=1.5)
 
-        if self.hitpoints <= 0:
-            self.is_alive = False
-            self.handlemessage(bs.DieMessage())
+        if self.hitpoints > self.hitpoints_max * 3 / 4:
+            bs.animate_array(self.shield_deco, 'color', 3,
+                             {0: self.shield_deco.color, 0.2: (4, 4, 4)})
+        elif self.hitpoints > self.hitpoints_max * 1 / 2:
+            bs.animate_array(self.shield_deco, 'color', 3,
+                             {0: self.shield_deco.color, 0.2: (3, 3, 5)})
+            self.bot_count = 4
+        elif self.hitpoints > self.hitpoints_max * 1 / 4:
+            bs.animate_array(self.shield_deco, 'color', 3,
+                             {0: self.shield_deco.color, 0.2: (1, 5, 1)})
+            self.bot_count = 5
+        else:
+            bs.animate_array(self.shield_deco, 'color', 3,
+                             {0: self.shield_deco.color, 0.2: (5, 0.2, 0.2)})
+            self.bot_count = 6
 
-    def attack(self):
-        if not self.is_alive or not self.node:
+    def _trigger_mid_health_event(self) -> None:
+        if self._dead:
             return
-        target_pt, _ = self._get_closest_player()
-        if target_pt is None:
-            return
-        self._say_attack_quote()
-        p = self.node.position
-        bomb_count = 2 if self._rage_mode else 1
-        for b in range(bomb_count):
-            if b == 1:
-                dx = random.uniform(-0.8, 0.8)
-                dz = random.uniform(-0.8, 0.8)
-            else:
-                dx = target_pt[0] - p[0]
-                dz = target_pt[2] - p[2]
-                dist = (dx**2 + dz**2)**0.5
-                if dist > 0:
-                    dx /= dist
-                    dz /= dist
-            bomb_pos = (p[0] + random.uniform(-0.5, 0.5), p[1] - 1.5, p[2] + random.uniform(-0.5, 0.5))
-            bomb_vel = (dx * 15, 3 + random.uniform(-0.5, 0.5), dz * 15)
-            bomb = Bomb(position=bomb_pos, velocity=bomb_vel, bomb_type='impact')
-            bomb.autoretain()
-            dark_effect = BombDarkMagicEffect(bomb.node)
-            dark_effect.start()
-        bs.emitfx(position=(p[0], p[1] - 1, p[2]), count=12, scale=1.5, spread=0.6, chunk_type='spark')
 
-    def start_effects(self):
-        def sparks():
-            if self.is_alive and self.node and self.node.exists():
-                count = random.randint(30, 60) if self._rage_mode else random.randint(20, 40)
-                scale = random.uniform(2, 3) if self._rage_mode else random.uniform(1.5, 2.5)
-                bs.emitfx(position=self.node.position, count=count, scale=scale,
-                          spread=random.uniform(2, 3) if self._rage_mode else random.uniform(1.5, 2.5),
-                          chunk_type='spark')
-        
-        def explosions():
-            if self.is_alive and self.node and self.node.exists():
-                bs.newnode('explosion', attrs={
-                    'position': self.node.position,
-                    'color': (random.uniform(0.8, 1), random.uniform(0.3, 0.6), random.uniform(0, 0.3)),
-                    'radius': random.uniform(2.5, 3.5) if self._rage_mode else random.uniform(2.0, 3.0)
-                })
-        self.spark_timer = bs.Timer(0.12, sparks, repeat=True)
-        self.explosion_timer = bs.Timer(0.4, explosions, repeat=True)
+        self._remaining_hp = max(1, self.hitpoints)
 
-    def stop_effects(self):
-        if hasattr(self, 'spark_timer') and self.spark_timer:
-            self.spark_timer = None
-        if hasattr(self, 'explosion_timer') and self.explosion_timer:
-            self.explosion_timer = None
+        self._dead = True
+        self.frozen = True
 
-    def do_damage(self, damage: int):
-        if not self.is_alive:
-            return
-        self.hitpoints -= damage
         if self.node:
-            count = 35 if self._rage_mode else 25
-            bs.emitfx(position=self.node.position, count=count, scale=2.2, spread=1.8, chunk_type='spark')
+            bs.animate(self.node, 'mesh_scale', {0: self.node.mesh_scale, 0.3: 0})
+            bs.timer(0.35, self.node.delete)
+        if self.suck:
+            bs.timer(0.1, self.suck.delete)
+        if self.shield_deco:
+            bs.timer(0.3, self.shield_deco.delete)
+
+        for timer_name in ('drop_bomb_timer', 'drop_bots_timer', '_move_timer'):
+            timer = getattr(self, timer_name, None)
+            if timer is not None:
+                try:
+                    timer.cancel()
+                except Exception:
+                    pass
+                setattr(self, timer_name, None)
+
+        try:
+            gnode = bs.getactivity().globalsnode
+            if gnode:
+                bs.animate_array(gnode, 'tint', 3, {
+                    0: gnode.tint,
+                    1.0: (0.02, 0.02, 0.04),
+                })
+        except Exception:
+            pass
+
+        self._spawn_dual_black_holes()
+
+    def _spawn_dual_black_holes(self) -> None:
+        try:
+            point = bs.getactivity().map.get_flag_position(None)
+            center_pos = (point[0], point[1] + 2.0, point[2])
+
+            start_offset = 20.0
+            start_y = center_pos[1] + 2.0
+
+            un_material = bs.Material()
+            un_material.add_actions(
+                actions=('modify_part_collision', 'collide', False)
+            )
+
+            red_core = bs.newnode('prop', attrs={
+                'body': 'sphere',
+                'position': (center_pos[0] + start_offset, start_y, center_pos[2]),
+                'mesh': bs.getmesh('shield'),
+                'color_texture': bs.gettexture('black'),
+                'shadow_size': 0.0,
+                'reflection_scale': [0.0],
+                'gravity_scale': 0.0,
+                'density': 0.0,
+                'body_scale': 0.0001,
+                'mesh_scale': 0.5,
+                'materials': [un_material],
+            })
+            red_ring = bs.newnode('shield', attrs={
+                'position': (center_pos[0] + start_offset, start_y, center_pos[2]),
+                'color': (10, 0.5, 0.5),
+                'radius': 0.8,
+            })
+            red_light = bs.newnode('light', attrs={
+                'position': (center_pos[0] + start_offset, start_y, center_pos[2]),
+                'color': (1.5, 0.2, 0.2),
+                'radius': 1.2,
+                'height_attenuated': False,
+                'intensity': 3.0,
+            })
+            red_core.connectattr('position', red_ring, 'position')
+            red_core.connectattr('position', red_light, 'position')
+
+            blue_core = bs.newnode('prop', attrs={
+                'body': 'sphere',
+                'position': (center_pos[0] - start_offset, start_y, center_pos[2]),
+                'mesh': bs.getmesh('shield'),
+                'color_texture': bs.gettexture('black'),
+                'shadow_size': 0.0,
+                'reflection_scale': [0.0],
+                'gravity_scale': 0.0,
+                'density': 0.0,
+                'body_scale': 0.0001,
+                'mesh_scale': 0.5,
+                'materials': [un_material],
+            })
+            blue_ring = bs.newnode('shield', attrs={
+                'position': (center_pos[0] - start_offset, start_y, center_pos[2]),
+                'color': (0.5, 0.5, 10),
+                'radius': 0.8,
+            })
+            blue_light = bs.newnode('light', attrs={
+                'position': (center_pos[0] - start_offset, start_y, center_pos[2]),
+                'color': (0.2, 0.2, 1.5),
+                'radius': 1.2,
+                'height_attenuated': False,
+                'intensity': 3.0,
+            })
+            blue_core.connectattr('position', blue_ring, 'position')
+            blue_core.connectattr('position', blue_light, 'position')
+
+            move_duration = 2.5
+            bs.animate_array(red_core, 'position', 3, {
+                0: (center_pos[0] + start_offset, start_y, center_pos[2]),
+                move_duration: center_pos,
+            })
+            bs.animate_array(blue_core, 'position', 3, {
+                0: (center_pos[0] - start_offset, start_y, center_pos[2]),
+                move_duration: center_pos,
+            })
+
+            hum_sound = bs.getsound('gravelSkid')
+            hum_sound.play()
+
+            bs.timer(move_duration, bs.CallStrict(self._spawn_bot_at_center, center_pos))
+
+            def cleanup_nodes():
+                for n in (red_core, red_ring, red_light, blue_core, blue_ring, blue_light):
+                    if n and n.exists():
+                        try:
+                            n.delete()
+                        except Exception:
+                            pass
+            bs.timer(move_duration + 0.2, cleanup_nodes)
+
+        except Exception:
+            pass
+
+    def _spawn_bot_at_center(self, center_pos: tuple) -> None:
+        try:
+            bs.emitfx(position=center_pos, count=100, scale=3.0, spread=4.0, chunk_type='spark')
+            bs.cameraflash()
+            bs.camerashake(intensity=2.5)
+            bs.getsound('tnt').play()
+
+            hp_for_mid = self._remaining_hp
+
+            def _on_spawn(bot):
+                self._mid_boss_bot = bot
+                try:
+                    bot.hitpoints = hp_for_mid
+                    bot.hitpoints_max = hp_for_mid
+                except Exception:
+                    pass
+
+                try:
+                    if self._score_text and self._score_text.node:
+                        self._score_text.node.text = str(hp_for_mid)
+                except Exception:
+                    pass
+
+                self._mid_boss_ui_timer = bs.Timer(
+                    0.05, bs.WeakCallStrict(self._sync_mid_boss_hp), repeat=True
+                )
+
+                bs.timer(0.5, self._mark_mid_boss_ready)
+
+            try:
+                self._bots.spawn_bot(
+                    MidBossRoboBot,
+                    pos=center_pos,
+                    spawn_time=0.0,
+                    on_spawn_call=_on_spawn,
+                )
+            except TypeError:
+                bot = self._bots.spawn_bot(MidBossRoboBot, pos=center_pos, spawn_time=0.0)
+                if bot is not None:
+                    _on_spawn(bot)
+                else:
+                    try:
+                        for b in self._bots.get_bots():
+                            _on_spawn(b)
+                            break
+                    except Exception:
+                        pass
+
+            self.hitpoints = hp_for_mid
+            self.hitpoints_max = hp_for_mid
+            self._bar_width = self._width_max
+            try:
+                if self._bar:
+                    self._bar.node.color = (0.5, 0.5, 0.5)
+                if self._bar_scale:
+                    bs.animate(self._bar_scale, 'input0',
+                               {0.0: self._bar_scale.input0, 0.1: self._width_max})
+                if self._bar_position:
+                    bs.animate(self._bar_position, 'input0',
+                               {0.0: self._bar_position.input0, 0.1: self.bar_posx + self._width_max / 2})
+                if self._score_text and self._score_text.node:
+                    self._score_text.node.text = str(hp_for_mid)
+            except Exception:
+                pass
+
+            gnode = bs.getactivity().globalsnode
+            if gnode:
+                bs.animate_array(gnode, 'tint', 3, {
+                    0: gnode.tint,
+                    0.8: (0.6, 0.7, 0.8),
+                })
+
+        except Exception:
+            pass
+
+    def _mark_mid_boss_ready(self) -> None:
+        self._mid_boss_ready = True
+
+    def update_ai(self) -> None:
+        if self.update_callback is not None:
+            if self.update_callback(self):
+                return
+        if not self.node or self._dead:
+            return
+        if not self._player_pts:
+            return
+
+        pos = self.node.position
+        our_pos = bs.Vec3(pos[0], pos[1] - 3, pos[2])
+        target_pt_raw, target_vel = self._get_target_player_pt()
+        if target_pt_raw is None:
+            return
+
+        try:
+            dist_raw = (target_pt_raw - our_pos).length()
+            target_pt = target_pt_raw + target_vel * dist_raw * 0.3
+        except:
+            return
+        diff = target_pt - our_pos
+        self.dist = diff
+        self.to_target = diff.normalized()
+
+        speed = 1.8 if self._rage_mode else 1.5
+        accel = 90 if self._rage_mode else 70
+
+        if self.hitpoints == 0:
+            self.node.velocity = (0, self.to_target.y, 0)
+            self.node.extra_acceleration = (0, self.to_target.y * 80 + 70, 0)
+        elif not self.frozen:
+            self.node.velocity = (self.to_target.x * speed, self.to_target.y * speed * 0.6, self.to_target.z * speed)
+            self.node.extra_acceleration = (self.to_target.x, self.to_target.y * 80 + accel, self.to_target.z)
+
+    def on_expire(self) -> None:
+        super().on_expire()
+        self.update_callback = None
+        if self._mid_boss_ui_timer:
+            try:
+                self._mid_boss_ui_timer.cancel()
+            except Exception:
+                pass
+            self._mid_boss_ui_timer = None
+
+    def animate_mesh(self) -> None:
+        if not self.node:
+            return None
+        bs.emitfx(position=self.node.position,
+                  velocity=self.node.velocity,
+                  count=int(6 + random.random() * 10),
+                  scale=0.5,
+                  spread=0.4,
+                  chunk_type='metal')
 
     def handlemessage(self, msg: Any) -> Any:
-        if isinstance(msg, bs.DieMessage):
-            self.is_alive = False
-            quote = random.choice(BOSS_QUOTES['death'])
-            ScreenMessage(quote, "Skeleton King", color=(1, 0.2, 0.2), duration=3.0)
-            if self.attack_timer:
-                self.attack_timer = None
-            if self.update_timer:
-                self.update_timer = None
-            if self.bot_timer:
-                self.bot_timer = None
-            if self.talk_timer:
-                self.talk_timer = None
-            if self.position_lock:
-                self.position_lock = None
-            if self.player_track_timer:
-                self.player_track_timer = None
-            if self._boss_color_timer:
-                self._boss_color_timer = None
-            if self.position_update_timer:
-                self.position_update_timer = None
-            if self._rage_effect_timer:
-                self._rage_effect_timer = None
-            self.stop_effects()
+        if isinstance(msg, bs.HitMessage):
+            self.animate_mesh()
+            if self.hitpoints != 0 and not self._dead:
+                self.do_damage(msg)
+            self._update()
+
+        elif isinstance(msg, bs.DieMessage):
+            if self._dead:
+                return None
+            self._dead = True
             if self.node:
-                pos = self.node.position
-                for i in range(15):
-                    bs.timer(i * 0.1, lambda p=pos: Blast(position=p, blast_radius=4.5).autoretain())
-                bs.emitfx(position=pos, count=150, scale=4.5, spread=4, chunk_type='spark')
-                self.node.delete()
-            if self.boss_name_text:
-                self.boss_name_text.delete()
-            if self.boss_name_shadow:
-                self.boss_name_shadow.delete()
-            if hasattr(self, '_backing') and self._backing:
-                self._backing.node.delete()
-            if hasattr(self, '_bar') and self._bar:
-                self._bar.node.delete()
-            if hasattr(self, '_cover') and self._cover:
-                self._cover.node.delete()
-            if hasattr(self, '_title_text') and self._title_text:
-                self._title_text.node.delete()
-            if hasattr(self, '_score_text') and self._score_text:
-                self._score_text.node.delete()
-        elif isinstance(msg, bs.HitMessage):
-            damage = int(abs(msg.magnitude) / 15)
-            if damage < 3:
-                damage = 3
-            if damage > 15:
-                damage = 15
-            self.do_damage(damage)
+                self.hitpoints = 0
+                self.frozen = True
+
+                for timer_name in ('drop_bomb_timer', 'drop_bots_timer', '_move_timer'):
+                    timer = getattr(self, timer_name, None)
+                    if timer is not None:
+                        try:
+                            timer.cancel()
+                        except Exception:
+                            pass
+                        setattr(self, timer_name, None)
+
+                p = self.node.position
+
+                try:
+                    black_hole = BlackHole(
+                        position=p,
+                        radius=BLACKHOLE_RADIUS,
+                        xspeed=BLACKHOLE_XSPEED,
+                        ssize=BLACKHOLE_SSIZE,
+                    )
+
+                    try:
+                        gnode = bs.getactivity().globalsnode
+                        if gnode:
+                            current_tint = gnode.tint
+                            bs.animate_array(gnode, 'tint', 3, {
+                                0: current_tint,
+                                0.3: (0.06, 0.06, 0.08),
+                                0.6: (0.03, 0.03, 0.05),
+                            })
+                    except Exception:
+                        pass
+
+                    bs.timer(3.0, lambda: black_hole.handlemessage(bs.DieMessage()))
+                except Exception:
+                    pass
+
+                bs.timer(0.5, self.node.delete)
+                bs.timer(0.1, self.suck.delete)
+
         elif isinstance(msg, bs.OutOfBoundsMessage):
-            if self.node and self.node.exists():
-                self.node.position = self.position
-                self.node.velocity = (0, 0, 0)
+            if self._dead:
+                return None
+            activity = bs.getactivity()
+            try:
+                point = activity.map.get_flag_position(None)
+                boss_spawn_pos = (point[0], point[1] + 3.5, point[2])
+                assert self.node
+                self.node.position = boss_spawn_pos
+            except:
+                self.handlemessage(bs.DieMessage())
+
+        elif isinstance(msg, bs.FreezeMessage):
+            if self._dead:
+                return None
+            if not self.frozen:
+                self.frozen = True
+                for timer_name in ('drop_bomb_timer', 'drop_bots_timer'):
+                    timer = getattr(self, timer_name, None)
+                    if timer is not None:
+                        try:
+                            timer.cancel()
+                        except Exception:
+                            pass
+                        setattr(self, timer_name, None)
+                self.node.velocity = (0, self.to_target.y, 0)
+                self.node.extra_acceleration = (0, 0, 0)
+                self.node.reflection_scale = [2]
+
+                def unfrozen():
+                    if self._dead:
+                        return
+                    self.frozen = False
+                    self.drop_bomb_timer = bs.Timer(1.5, bs.CallStrict(self._drop_bomb), repeat=True)
+                    self.drop_bots_timer = bs.Timer(15.0, bs.CallStrict(self._drop_bots), repeat=True)
+                    self.node.reflection_scale = [0.25]
+
+                bs.timer(3.0, unfrozen)
+
         else:
             super().handlemessage(msg)
-
-
-class FadeEffect():
-    def __init__(self, map_tint=(1, 1, 1)):
-        gnode = bs.getactivity().globalsnode
-        bs.animate_array(gnode, 'tint', 3, {0: (0, 0, 0), 1.5: map_tint})
-        text = bs.newnode('text', attrs={
-            'position': (0, 250), 'text': 'Loading...', 'color': (1, 0, 0),
-            'h_align': 'center', 'v_align': 'center', 'vr_depth': 410,
-            'maxwidth': 600, 'shadow': 1.0, 'flatness': 1.0,
-            'scale': 2.5, 'h_attach': 'center', 'v_attach': 'bottom', 'big': True
-        })
-        bs.animate(text, 'opacity', {0: 0, 0.2: 1, 0.4: 1, 2: 0})
-        bs.timer(2.5, text.delete)
-        text = bs.newnode('text', attrs={
-            'position': (0, 270), 'text': 'BSLIFE PRESENT', 'color': (1, 0.55, 0),
-            'h_align': 'center', 'v_align': 'center', 'vr_depth': 410,
-            'maxwidth': 600, 'shadow': 1.0, 'flatness': 1.0,
-            'scale': 2.5, 'h_attach': 'center', 'v_attach': 'bottom'
-        })
-        bs.animate(text, 'opacity', {0: 0, 0.2: 1, 0.4: 1, 2: 0})
-        bs.timer(2.5, text.delete)
 
 
 class Player(bs.Player['Team']):
@@ -824,15 +1231,85 @@ class Team(bs.Team[Player]):
         self.score = 0
 
 
+class CustomPlayerSpaz(PlayerSpaz):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.default_bomb_type = 'impact'
+        self.bomb_type = 'impact'
+        self.bomb_type_default = 'impact'
+
+
+class FadeEffect:
+    def __init__(self, map_tint=(1, 1, 1)):
+        gnode = bs.getactivity().globalsnode
+        bs.animate_array(gnode, 'tint', 3, {0: (0, 0, 0), 1.5: map_tint})
+
+
+# ba_meta export bascenev1.Map
+class BasketMapV2(bs.Map):
+    name = 'BasketBall Stadium OG V2'
+
+    @classmethod
+    def get_play_types(cls) -> list[str]:
+        return ['melee', 'team_flag', 'keep_away', 'conquest', 'king_of_the_hill']
+
+    @classmethod
+    def get_preview_texture_name(cls) -> str:
+        return 'hockeyStadiumPreview'
+
+    @classmethod
+    def on_preload(cls) -> Any:
+        data: dict[str, Any] = {
+            'mesh': bs.getmesh('hockeyStadiumInner'),
+            'bg_mesh': bs.getmesh('thePadBG'),
+        }
+        return data
+
+    def __init__(self) -> None:
+        super().__init__(vr_overlay_offset=(0, -0.8, -1.1))
+        shared = SharedObjects.get()
+
+        try:
+            data = self.preloaddata
+            if not data:
+                raise Exception
+        except Exception:
+            data = self.on_preload()
+
+        self.node = bs.newnode('terrain', delegate=self, attrs={
+            'mesh': data['bg_mesh'],
+            'color_texture': bs.gettexture('menuBG'),
+            'materials': [shared.footing_material],
+            'color': (1.0, 0.2, 1.0),
+        })
+        self.floor = bs.newnode('terrain', attrs={
+            'mesh': data['mesh'],
+            'color_texture': bs.gettexture('white'),
+            'opacity': 0.92,
+            'color': (0.7, 0.4, 0.1),
+            'materials': [shared.footing_material],
+        })
+        gnode = bs.getactivity().globalsnode
+        gnode.floor_reflection = True
+        gnode.debris_friction = 0.3
+        gnode.debris_kill_height = -0.3
+        gnode.tint = (0.6, 0.7, 0.8)
+        gnode.ambient_color = (1.15, 1.25, 1.6)
+        gnode.vignette_outer = (0.66, 0.67, 0.73)
+        gnode.vignette_inner = (0.93, 0.93, 0.95)
+        gnode.vr_camera_offset = (0, -0.8, -1.1)
+        gnode.vr_near_clip = 0.5
+
+
 # ba_meta export bascenev1.GameActivity
 class DoomBossFightGame(bs.TeamGameActivity[Player, Team]):
-    name = 'Doom Island'
-    description = 'Defeat the Skeleton King!\nBSLIFE PRESENT'
+    name = 'UFO Boss Fight'
+    description = 'Defeat the UFO King!\nBSRUSH PRESENT'
 
     @classmethod
     def get_available_settings(cls, sessiontype: type[bs.Session]) -> list:
         return [
-            bs.IntSetting('Boss Health', min_value=100, default=1000, increment=50),
+            bs.IntSetting('Boss Health', min_value=100, default=1000, increment=100),
             bs.IntChoiceSetting('Time Limit', choices=[('None', 0), ('5 Minutes', 300), ('10 Minutes', 600)], default=0),
             bs.BoolSetting('Epic Mode', default=True),
         ]
@@ -843,22 +1320,17 @@ class DoomBossFightGame(bs.TeamGameActivity[Player, Team]):
 
     @classmethod
     def get_supported_maps(cls, sessiontype: type[bs.Session]) -> list[str]:
-        return ['Doom Island']
+        return ['BasketBall Stadium OG V2']
 
     def __init__(self, settings: dict):
+        settings = dict(settings)
+        settings['map'] = 'BasketBall Stadium OG V2'
+
         super().__init__(settings)
         self._scoreboard = Scoreboard()
-        
-        # تعداد بازیکنان
         self._player_count = 0
-        
-        # محاسبه هیل بر اساس تعداد بازیکنان (هیل پایه 1000)
-        player_count = len(self.players) if hasattr(self, 'players') else 0
-        base_health = 1000
-        extra_health = max(0, (player_count - 2) * 50) if player_count > 0 else 0
-        final_health = base_health + extra_health
-        
-        self._boss_health = final_health
+        base_health = int(settings.get('Boss Health', 1000))
+        self._boss_health = base_health
         self._time_limit = float(settings.get('Time Limit', 0))
         self._epic_mode = bool(settings.get('Epic Mode', True))
         self.slow_motion = self._epic_mode
@@ -868,98 +1340,271 @@ class DoomBossFightGame(bs.TeamGameActivity[Player, Team]):
         self._game_over = False
         self._players_joined = False
         self._game_won = False
+        self._win_timer: Optional[bs.Timer] = None
+        self._lose_timer: Optional[bs.Timer] = None
+        self._boss_update_timer: bs.Timer | None = None
+        self._boss_died = False
+        self._game_end_delay = 4.0
 
-    def spawn_player(self, player: Player) -> bs.Actor:
-        """اسپاون پلیر با بمب ایمپکت"""
+        self._intro_nodes: list = []
+        self._intro_spotlight = None
+        self._intro_spawn_pos = None
+        self._intro_finished = False
+        self._intro_freeze_timer: bs.Timer | None = None
+        self._player_spawn_positions: dict = {}
+        self._player_intro_return_pos: dict = {}
+
+    NORMAL_TINT = (0.6, 0.7, 0.8)
+    NORMAL_AMBIENT = (1.15, 1.25, 1.6)
+
+    def spawn_player(self, player: Player, connect_controls: bool = True) -> bs.Actor:
         if isinstance(self.session, bs.DualTeamSession):
             position = self.map.get_start_position(player.team.id)
         else:
             position = self.map.get_ffa_start_position(self.players)
-        
+
+        self._player_spawn_positions[player] = position
+
         spaz = CustomPlayerSpaz(color=player.color,
                                 highlight=player.highlight,
                                 character=player.character,
                                 player=player)
-        
+
         player.actor = spaz
         assert spaz.node
-        
+
         spaz.node.name = player.getname()
         spaz.node.name_color = babase.safecolor(player.color, target_intensity=0.75)
-        
+
         spaz.default_bomb_type = 'impact'
         spaz.bomb_type = 'impact'
         spaz.bomb_type_default = 'impact'
-        
-        spaz.connect_controls_to_player()
+
+        if connect_controls:
+            spaz.connect_controls_to_player()
         spaz.handlemessage(bs.StandMessage(position, random.uniform(0, 360)))
-        
+
         self._spawn_sound.play(1, position=spaz.node.position)
-        
+
         return spaz
+
+    def _connect_all_controls(self) -> None:
+        for player in self.players:
+            if player.actor:
+                try:
+                    player.actor.connect_controls_to_player()
+                except Exception:
+                    pass
+
+    def _update_boss_player_points(self):
+        if not self.boss:
+            return
+        player_pts = []
+        for player in self.players:
+            if player.is_alive() and player.actor and player.actor.node:
+                player_pts.append((
+                    bs.Vec3(player.actor.node.position),
+                    bs.Vec3(player.actor.node.velocity)
+                ))
+        self.boss.set_player_points(player_pts)
 
     def on_begin(self):
         super().on_begin()
         self.setup_standard_time_limit(self._time_limit)
         self.setup_standard_powerup_drops()
-        
-        # شمارش تعداد بازیکنان واقعی (نه بات)
+
+        try:
+            gnode = self.globalsnode
+            if gnode:
+                gnode.tint = (0.6, 0.7, 0.8)
+                gnode.ambient_color = (1.15, 1.25, 1.6)
+                gnode.vignette_outer = (0.66, 0.67, 0.73)
+                gnode.vignette_inner = (0.93, 0.93, 0.95)
+        except Exception:
+            pass
+        FadeEffect((0.6, 0.7, 0.8))
+
         self._player_count = max(1, len([p for p in self.players if p]))
-        
-        # پیام خرید اشتراک
-        self._subscribe_text = bs.newnode('text',
-                                          attrs={
-                                              'position': (-600, 650),
-                                              'text': 'Telegram / Rubika : @Taha_OstadSharif',
-                                              'h_align': 'left',
-                                              'v_attach': 'bottom',
-                                              'color': (1, 0.8, 0),
-                                              'scale': 0.8,
-                                              'shadow': 0.5
-                                          })
-        
-        self.boss = SkeletonBoss(position=(0.29, 7.5, -7.5), hitpoints=self._boss_health, player_count=self._player_count)
-        self._check_timer = bs.Timer(0.5, self._check_game_state, repeat=True)
-        self._boss_text = bs.newnode('text', attrs={
-            'position': (0, 200), 'text': 'DEFEAT THE SKELETON KING',
-            'h_align': 'center', 'v_attach': 'bottom', 'color': (1, 0.3, 0),
-            'scale': 1.2, 'shadow': 0.5
-        })
-        bs.animate(self._boss_text, 'opacity', {0: 0, 2: 1, 3: 0.8}, loop=False)
-        bs.timer(8, self._boss_text.delete)
+
         self._players_joined = True
-        self._spawn_players()
+        self._spawn_players(connect_controls=False)
+
+        self._start_boss_intro()
 
     def on_player_join(self, player: Player) -> None:
         if self.has_begun() and self._players_joined:
-            bs.screenmessage(babase.Lstr(value="Bazi dar jaryan ast nemitavanid vared shavid"), color=(1, 0.2, 0.2))
             return
         super().on_player_join(player)
 
-    def _spawn_players(self):
+    def _spawn_players(self, connect_controls: bool = True):
         for player in self.players:
             if not player.is_alive():
-                self.spawn_player(player)
+                self.spawn_player(player, connect_controls=connect_controls)
+
+    def _start_boss_intro(self) -> None:
+        try:
+            point = self.map.get_flag_position(None)
+            boss_spawn_pos = (point[0], point[1] + 3.5, point[2])
+        except Exception:
+            boss_spawn_pos = (0.0, 3.5, 0.0)
+        self._intro_spawn_pos = boss_spawn_pos
+
+        gnode = self.globalsnode
+        if gnode:
+            self._pre_intro_tint = self.NORMAL_TINT
+            bs.animate_array(gnode, 'tint', 3, {
+                0: gnode.tint,
+                0.6: (0.015, 0.015, 0.02),
+            })
+
+        self._intro_saved_aoi_players: list = []
+        for player in self.players:
+            actor = player.actor
+            if actor and getattr(actor, 'node', None) and actor.node.exists():
+                try:
+                    actor.node.is_area_of_interest = False
+                    self._intro_saved_aoi_players.append(actor.node)
+                except Exception:
+                    pass
+
+        self._intro_spotlight = bs.newnode('light', attrs={
+            'position': boss_spawn_pos,
+            'color': (1.2, 0.3, 1.4),
+            'radius': 0.4,
+            'height_attenuated': False,
+            'intensity': 0.0,
+        })
+        bs.animate(self._intro_spotlight, 'intensity', {0: 0.0, 0.5: 4.0, 2.6: 4.0, 3.0: 0.5})
+
+        core = bs.newnode('prop', attrs={
+            'body': 'sphere',
+            'position': boss_spawn_pos,
+            'mesh': bs.getmesh('shield'),
+            'color_texture': bs.gettexture('black'),
+            'shadow_size': 0.0,
+            'reflection_scale': [0.0],
+            'gravity_scale': 0.0,
+            'density': 0.0,
+            'body_scale': 0.0001,
+            'mesh_scale': 0.001,
+            'is_area_of_interest': True,
+        })
+        ring = bs.newnode('shield', attrs={
+            'position': boss_spawn_pos,
+            'color': (6, 1, 8),
+            'radius': 0.1,
+        })
+        bs.animate(core, 'mesh_scale', {0: 0.001, 0.7: 1.1, 2.4: 1.1, 2.9: 0.001})
+        bs.animate(ring, 'radius', {0: 0.1, 0.7: 1.4, 2.4: 1.4, 2.9: 0.1})
+
+        hum_sound = bs.newnode('sound', attrs={'sound': bs.getsound('gravelSkid')})
+        bs.animate(hum_sound, 'volume', {0: 0, 0.6: 1.0, 2.4: 1.0, 3.0: 0})
+
+        self._intro_nodes = [core, ring, hum_sound]
+
+        bs.camerashake(intensity=0.5)
+
+        bs.timer(3.0, self._finish_boss_intro)
+
+    def _finish_boss_intro(self) -> None:
+        if self._game_over:
+            return
+
+        if self._intro_spotlight and self._intro_spotlight.exists():
+            bs.animate(self._intro_spotlight, 'intensity',
+                      {0: self._intro_spotlight.intensity, 0.12: 9.0, 0.4: 0.0})
+            bs.timer(0.5, self._intro_spotlight.delete)
+
+        if self._intro_spawn_pos:
+            bs.emitfx(position=self._intro_spawn_pos, count=80, scale=2.5, spread=3.0, chunk_type='spark')
+
+        bs.cameraflash()
+        bs.camerashake(intensity=3.0)
+        bs.getsound('gravelSkid').play()
+
+        for node in self._intro_nodes:
+            if node and node.exists():
+                bs.timer(0.05, node.delete)
+        self._intro_nodes = []
+
+        gnode = self.globalsnode
+        if gnode:
+            bs.animate_array(gnode, 'tint', 3, {0: gnode.tint, 0.8: self._pre_intro_tint})
+
+        for node in getattr(self, '_intro_saved_aoi_players', []):
+            if node and node.exists():
+                try:
+                    node.is_area_of_interest = True
+                except Exception:
+                    pass
+        self._intro_saved_aoi_players = []
+
+        self.boss = UFO(hitpoints=self._boss_health)
+        self._check_timer = bs.Timer(0.25, self._check_game_state, repeat=True)
+        self._boss_update_timer = bs.Timer(0.1, self._update_boss_player_points, repeat=True)
+
+        self._connect_all_controls()
+        self._intro_finished = True
 
     def _check_game_state(self):
         if self._game_over:
             return
-        if self.boss and not self.boss.is_alive and not self._game_won:
-            self._game_won = True
-            self._game_over = True
-            if self._check_timer:
-                self._check_timer = None
-            self.boss._say_lose_quote()
-            self._end_game_won()
-            return
+
+        mid_triggered = bool(getattr(self.boss, '_mid_health_triggered', False)) if self.boss else False
+
+        if mid_triggered:
+            mid_ready = bool(getattr(self.boss, '_mid_boss_ready', False)) if self.boss else False
+            mid_bot = getattr(self.boss, '_mid_boss_bot', None) if self.boss else None
+
+            if mid_ready and mid_bot is not None:
+                bot_alive = False
+                bot_hp = 0
+                try:
+                    if mid_bot.node and mid_bot.node.exists():
+                        bot_alive = True
+                        bot_hp = int(getattr(mid_bot, 'hitpoints', 0))
+                except Exception:
+                    bot_alive = False
+
+                if (not bot_alive or bot_hp <= 0) and not self._game_won:
+                    self._game_won = True
+                    self._game_over = True
+                    if self._check_timer:
+                        self._check_timer = None
+                    if self._boss_update_timer:
+                        self._boss_update_timer = None
+                    self._win_timer = bs.timer(self._game_end_delay, self._end_game_won)
+                    return
+        else:
+            if (self.boss and not self._game_won and not self._boss_died
+                    and not getattr(self.boss, '_mid_health_triggered', False)):
+                ufo_dead = bool(getattr(self.boss, '_dead', False))
+                if ufo_dead:
+                    self._boss_died = True
+                    self._game_won = True
+                    self._game_over = True
+                    if self._check_timer:
+                        self._check_timer = None
+                    if self._boss_update_timer:
+                        self._boss_update_timer = None
+                    self._win_timer = bs.timer(self._game_end_delay, self._end_game_won)
+                    return
+
         alive_players = [p for p in self.players if p.is_alive()]
         if len(alive_players) == 0 and not self._game_over:
             self._game_over = True
             if self._check_timer:
                 self._check_timer = None
-            if self.boss and self.boss.is_alive:
-                self.boss._say_win_quote()
-            self._end_game_lose()
+            if self._boss_update_timer:
+                self._boss_update_timer = None
+
+            if self.boss and self.boss.is_alive and not self._boss_died:
+                self._boss_died = True
+                self.boss.handlemessage(bs.DieMessage())
+
+            if self._lose_timer:
+                self._lose_timer = None
+            self._lose_timer = bs.timer(self._game_end_delay, self._end_game_lose)
 
     def _end_game_won(self):
         results = bs.GameResults()
@@ -967,30 +1612,14 @@ class DoomBossFightGame(bs.TeamGameActivity[Player, Team]):
             results.set_team_score(team, 1)
         bs.cameraflash()
         bs.getsound('score').play()
-        win_text = bs.newnode('text', attrs={
-            'position': (0, 200), 'text': 'VICTORY', 'h_align': 'center',
-            'v_attach': 'bottom', 'color': (1, 0.8, 0), 'scale': 1.5, 'shadow': 0.8
-        })
-        bs.animate(win_text, 'opacity', {0: 0, 0.5: 1, 3: 0})
-        bs.timer(3, win_text.delete)
-        self.end(results=results)
+        self.end(results=results, announce_delay=3.0)
 
     def _end_game_lose(self):
         results = bs.GameResults()
         for team in self.teams:
             results.set_team_score(team, 0)
-        dead_names = [p.getname(full=True) for p in self.players if not p.is_alive()]
-        if dead_names:
-            names_str = ", ".join(dead_names[:3])
-            bs.screenmessage(babase.Lstr(value=f"{names_str} tavasote Skeleton King shekast khordand"), color=(1, 0.2, 0.2))
-        lose_text = bs.newnode('text', attrs={
-            'position': (0, 200), 'text': 'GAME OVER', 'h_align': 'center',
-            'v_attach': 'bottom', 'color': (1, 0.2, 0.2), 'scale': 1.5, 'shadow': 0.8
-        })
-        bs.animate(lose_text, 'opacity', {0: 0, 0.5: 1, 3: 0})
-        bs.timer(3, lose_text.delete)
         bs.getsound('error').play()
-        self.end(results=results)
+        self.end(results=results, announce_delay=3.0)
 
     def handlemessage(self, msg: Any) -> Any:
         if isinstance(msg, bs.PlayerDiedMessage):
@@ -998,188 +1627,13 @@ class DoomBossFightGame(bs.TeamGameActivity[Player, Team]):
         else:
             super().handlemessage(msg)
 
-    def end(self, results: bs.GameResults) -> None:
+    def end(self, results: bs.GameResults = None, **kwargs) -> None:
         if self.boss and self.boss.is_alive:
             self.boss.handlemessage(bs.DieMessage())
-        super().end(results)
-
-
-class DoomIslandMapData():
-    points = {}
-    boxes = {}
-    boxes['area_of_interest_bounds'] = ((0.3544110667, 7.616383286, 3.066055072) + (0.0, 0.0, 0.0) + (30, 30, 30))
-    boxes['edge_box'] = ((0.3544110667, 5.438284793, -4.100357672) + (0.0, 0.0, 0.0) + (12.57718032, 4.645176013, 3.605557343))
-    points['ffa_spawn1'] = (0.5006944438, 5.051501304, -5.79356326) + (6.626174027, 1.0, 0.3402012662)
-    points['ffa_spawn2'] = (0.5006944438, 5.051501304, -2.435321368) + (6.626174027, 1.0, 0.3402012662)
-    points['ffa_spawn3'] = (7.941690444946289, -4.203672409057617, -10.778594017028809) + (2.0, 1.0, 0.3402012662)
-    points['ffa_spawn4'] = (-7.941690444946289, -4.203672409057617, -10.778594017028809) + (2.0, 1.0, 0.3402012662)
-    points['ffa_spawn5'] = (7.941690444946289, -4.203672409057617, 5) + (2.0, 1.0, 0.0)
-    points['ffa_spawn6'] = (-7.941690444946289, -4.203672409057617, 5) + (2.0, 1.0, 0.0)
-    points['flag1'] = (-5.885814199, 5.112162255, -4.251754911)
-    points['flag2'] = (6.700855451, 5.10270501, -4.259912982)
-    points['flag_default'] = (0.3196701116, 5.110914413, -4.292515158)
-    boxes['map_bounds'] = ((0.4528955042, 4.899663734, -3.543675157) + (0.0, 0.0, 0.0) + (30, 30, 30))
-    points['powerup_spawn1'] = (-2.645358507, 6.426340583, -4.226597191)
-    points['powerup_spawn2'] = (3.540102796, 6.549722855, -4.198476335)
-    points['powerup_spawn3'] = (-8.462557792663574, -4.203629970550537, -8.088696479797363)
-    points['powerup_spawn4'] = (-8.349356651306152, -4.203611850738525, -4.202945232391357)
-    points['powerup_spawn5'] = (-8.560944557189941, -4.203898906707764, 0.43137887120246887)
-    points['powerup_spawn6'] = (8.462557792663574, -4.203629970550537, -8.088696479797363)
-    points['powerup_spawn7'] = (8.349356651306152, -4.203611850738525, -4.202945232391357)
-    points['powerup_spawn8'] = (8.560944557189941, -4.203898906707764, 0.43137887120246887)
-    points['powerup_spawn9'] = (0.17930641770362854, -4.203766822814941, 3.233539581298828)
-    points['spawn1'] = (-4.745706238, 5.051501304, -4.247934288) + (0.9186962739, 1.0, 0.5153189341)
-    points['spawn2'] = (5.838590388, 5.051501304, -4.259627405) + (0.9186962739, 1.0, 0.5153189341)
-
-
-class DoomIsland(bs.Map):
-    defs = DoomIslandMapData()
-    name = 'Doom Island'
-
-    @classmethod
-    def get_play_types(cls) -> list[str]:
-        return ['melee', 'keep_away', 'team_flag']
-
-    @classmethod
-    def get_preview_texture_name(cls) -> str:
-        return 'rampageBGColor2'
-
-    @classmethod
-    def on_preload(cls) -> Any:
-        data: dict[str, Any] = {
-            'mesh': bs.getmesh('rampageLevel'),
-            'bottom_mesh': bs.getmesh('rampageLevelBottom'),
-            'collision_mesh': bs.getcollisionmesh('rampageLevelCollide'),
-            'tex': bs.gettexture('bg'),
-            'bgtex': bs.gettexture('rampageBGColor'),
-            'bgtex2': bs.gettexture('impactBombColorLit'),
-            'bgmesh': bs.getmesh('rampageBG'),
-            'bgmesh2': bs.getmesh('thePadBG'),
-            'vr_fill_mesh': bs.getmesh('rampageVRFill'),
-            'railing_collision_mesh': bs.getcollisionmesh('rampageBumper'),
-        }
-        return data
-
-    def __init__(self) -> None:
-        super().__init__(vr_overlay_offset=(0, 0, 2))
-        shared = SharedObjects.get()
-        self.collide_material = bs.Material()
-        self.collide_material.add_actions(
-            conditions=('we_are_older_than', 1),
-            actions=('modify_part_collision', 'collide', True))
-        self.node = bs.newnode('terrain', delegate=self, attrs={
-            'collision_mesh': self.preloaddata['collision_mesh'],
-            'mesh': self.preloaddata['mesh'],
-            'color_texture': self.preloaddata['tex'],
-            'materials': [shared.footing_material],
-            'color': (2, 2, 2),
-            'reflection': 'soft',
-            'reflection_scale': (2.5, 0, 0),
-        })
-        self.background = bs.newnode('terrain', attrs={
-            'mesh': self.preloaddata['bgmesh'],
-            'lighting': False,
-            'background': True,
-            'color_texture': self.preloaddata['bgtex'],
-            'color': (0.45, 0, 0),
-            'reflection': 'soft',
-            'reflection_scale': (1.5, 0, 0),
-        })
-        self.bg2 = bs.newnode('terrain', attrs={
-            'mesh': self.preloaddata['bgmesh2'],
-            'lighting': False,
-            'background': True,
-            'color_texture': self.preloaddata['bgtex2'],
-            'color': (0.45, 0.45, 0.45),
-        })
-        self.bottom = bs.newnode('terrain', attrs={
-            'mesh': self.preloaddata['bottom_mesh'],
-            'lighting': False,
-            'color_texture': bs.gettexture('rampageLevelColor'),
-            'reflection': 'soft',
-            'reflection_scale': (2.5, 0, 0),
-        })
-        bs.newnode('terrain', attrs={
-            'mesh': self.preloaddata['vr_fill_mesh'],
-            'lighting': False,
-            'vr_only': True,
-            'background': True,
-            'color_texture': self.preloaddata['bgtex2'],
-        })
-        self.railing = bs.newnode('terrain', attrs={
-            'collision_mesh': self.preloaddata['railing_collision_mesh'],
-            'materials': [shared.railing_material],
-            'bumper': True,
-        })
-        self.collision_region = bs.newnode('region', attrs={
-            'position': (0.0, -20, -5), 'type': 'box', 'scale': (1, 1, 1)
-        })
-        self.no_collision = bs.Material()
-        self.no_collision.add_actions(
-            conditions=('they_have_material', shared.player_material),
-            actions=(('modify_part_collision', 'collide', False), ('modify_part_collision', 'physical', False)))
-        self.skull_left = bs.newnode('prop', attrs={
-            'position': (-3.0, 6.5, -7.5), 'mesh': bs.getmesh('bonesHead'),
-            'color_texture': bs.gettexture('bonesColor'), 'mesh_scale': 1.2,
-            'body': 'crate', 'body_scale': 0.0, 'gravity_scale': 0.0,
-            'shadow_size': 0.0, 'reflection': 'soft', 'reflection_scale': [0.45],
-            'damping': float("inf"), 'density': float("inf"), 'materials': [self.no_collision]
-        })
-        self.skull_right = bs.newnode('prop', attrs={
-            'position': (3.5, 6.5, -7.5), 'mesh': bs.getmesh('bonesHead'),
-            'color_texture': bs.gettexture('bonesColor'), 'mesh_scale': 1.2,
-            'body': 'crate', 'body_scale': 0.0, 'gravity_scale': 0.0,
-            'shadow_size': 0.0, 'reflection': 'soft', 'reflection_scale': [0.45],
-            'damping': float("inf"), 'density': float("inf"), 'materials': [self.no_collision]
-        })
-        self.skull_front = bs.newnode('prop', attrs={
-            'position': (0.29, 6.5, -4.0), 'mesh': bs.getmesh('bonesHead'),
-            'color_texture': bs.gettexture('bonesColor'), 'mesh_scale': 1.2,
-            'body': 'crate', 'body_scale': 0.0, 'gravity_scale': 0.0,
-            'shadow_size': 0.0, 'reflection': 'soft', 'reflection_scale': [0.45],
-            'damping': float("inf"), 'density': float("inf"), 'materials': [self.no_collision]
-        })
-        self.skull_back = bs.newnode('prop', attrs={
-            'position': (0.29, 6.5, -11.5), 'mesh': bs.getmesh('bonesHead'),
-            'color_texture': bs.gettexture('bonesColor'), 'mesh_scale': 1.2,
-            'body': 'crate', 'body_scale': 0.0, 'gravity_scale': 0.0,
-            'shadow_size': 0.0, 'reflection': 'soft', 'reflection_scale': [0.45],
-            'damping': float("inf"), 'density': float("inf"), 'materials': [self.no_collision]
-        })
-        bs.animate_array(self.skull_left, 'position', 3, {
-            0: (-3.0, 6.5, -7.5), 1: (0.29, 6.5, -4.0), 2: (3.5, 6.5, -7.5),
-            3: (0.29, 6.5, -11.5), 4: (-3.0, 6.5, -7.5)
-        }, loop=True)
-        bs.animate_array(self.skull_front, 'position', 3, {
-            0: (0.29, 6.5, -4.0), 1: (3.5, 6.5, -7.5), 2: (0.29, 6.5, -11.5),
-            3: (-3.0, 6.5, -7.5), 4: (0.29, 6.5, -4.0)
-        }, loop=True)
-        bs.animate_array(self.skull_right, 'position', 3, {
-            0: (3.5, 6.5, -7.5), 1: (0.29, 6.5, -11.5), 2: (-3.0, 6.5, -7.5),
-            3: (0.29, 6.5, -4.0), 4: (3.5, 6.5, -7.5)
-        }, loop=True)
-        bs.animate_array(self.skull_back, 'position', 3, {
-            0: (0.29, 6.5, -11.5), 1: (-3.0, 6.5, -7.5), 2: (0.29, 6.5, -4.0),
-            3: (3.5, 6.5, -7.5), 4: (0.29, 6.5, -11.5)
-        }, loop=True)
-        gnode = bs.getactivity().globalsnode
-        gnode.tint = (1.2, 1.1, 0.97)
-        gnode.ambient_color = (1.3, 1.2, 1.03)
-        gnode.vignette_outer = (0.62, 0.64, 0.69)
-        gnode.vignette_inner = (0.97, 0.95, 0.93)
-        FadeEffect(gnode.tint)
-
-    def on_expire(self):
-        super().on_expire()
-
-
-try:
-    _map.register_map(DoomIsland)
-except RuntimeError:
-    pass
+        super().end(results, **kwargs)
 
 
 # ba_meta export babase.Plugin
-class BSLIFEPRESENT(babase.Plugin):
+class BSRUSHPRESENT(babase.Plugin):
     def on_app_running(self):
         pass
