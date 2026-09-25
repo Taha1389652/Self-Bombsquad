@@ -88,7 +88,6 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
         },
     )
 
-    # انیمیشن برای دایره شناور (اختیاری، برای زیبایی بیشتر)
     bs.animate_array(floating_ring, 'size', 1, {0.0: [0.0], 0.25: [_RING_SIZE]})
     bs.animate_array(floating_glow, 'size', 1, {0.0: [0.0], 0.25: [_RING_SIZE]})
     bs.animate(floating_ring, 'opacity', {0.0: 0.8, 0.6: 0.4, 1.2: 0.8}, loop=True)
@@ -97,15 +96,15 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
     def _update_floating_rings() -> None:
         if not node.exists():
             return
-        # موقعیت فعلی کاراکتر را بگیر و افست عمودی اعمال کن
         pos = node.position
         new_pos = (pos[0], pos[1] + _FLOATING_HEIGHT, pos[2])
         floating_ring.position = new_pos
         floating_glow.position = new_pos
 
-    # زمان‌بندی برای به‌روزرسانی هر فریم
-    with bs.Context(node):
-        bs.Timer(0.01, _update_floating_rings, repeat=True)
+    # ✅ رفع خطا: حذف 'with bs.Context(node)' و استفاده مستقیم از bs.Timer
+    # تایمر به صورت خودکار با مرگ کاراکتر متوقف نمی‌شود، بنابراین با owner=node
+    # آن را به گره متصل می‌کنیم تا عمر آن مدیریت شود.
+    bs.Timer(0.01, _update_floating_rings, repeat=True, owner=node)
 
 
 # ba_meta export babase.Plugin
