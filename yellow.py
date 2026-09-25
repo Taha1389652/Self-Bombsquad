@@ -20,7 +20,7 @@ _RING_COLOR = (1.0, 0.85, 0.0)  # yellow
 _RING_SIZE = 1.5  # matches the roughly torso-width ring in the reference
 _FLOATING_HEIGHT = 0.8  # ارتفاع دایره شناور از زمین (به متر)
 
-# نگه‌داشتن تایمرها در یک لیست سراسری تا از حذف شدنشان جلوگیری شود
+# نگه‌داشتن تایمرها در یک لیست سراسری تا از حذف شدنشان توسط زباله‌روب جلوگیری شود
 _active_timers = []
 
 
