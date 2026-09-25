@@ -20,6 +20,9 @@ _RING_COLOR = (1.0, 0.85, 0.0)  # yellow
 _RING_SIZE = 1.5  # matches the roughly torso-width ring in the reference
 _FLOATING_HEIGHT = 0.8  # ارتفاع دایره شناور از زمین (به متر)
 
+# نگه‌داشتن تایمرها در یک لیست سراسری تا از حذف شدنشان جلوگیری شود
+_active_timers = []
+
 
 def _ring_spaz_init(self, *args, **kwargs) -> None:
     _orig_spaz_init(self, *args, **kwargs)
@@ -31,7 +34,7 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
     if not node:
         return
 
-    # --- حلقه‌ی روی زمین (مثل قبل) ---
+    # --- حلقه‌ی روی زمین (فقط خط دور، بدون داخل) ---
     ring = bs.newnode(
         'locator',
         owner=node,
@@ -45,21 +48,7 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
         },
     )
 
-    glow = bs.newnode(
-        'locator',
-        owner=node,
-        attrs={
-            'shape': 'circle',
-            'position': node.position,
-            'color': _RING_COLOR,
-            'opacity': 0.2,
-            'draw_beauty': False,
-            'additive': True,
-        },
-    )
-
     node.connectattr('position', ring, 'position')
-    node.connectattr('position', glow, 'position')
 
     # --- حلقه‌ی شناور جدید ---
     floating_ring = bs.newnode(
@@ -75,21 +64,7 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
         },
     )
 
-    floating_glow = bs.newnode(
-        'locator',
-        owner=node,
-        attrs={
-            'shape': 'circle',
-            'position': node.position,
-            'color': _RING_COLOR,
-            'opacity': 0.15,
-            'draw_beauty': False,
-            'additive': True,
-        },
-    )
-
     bs.animate_array(floating_ring, 'size', 1, {0.0: [0.0], 0.25: [_RING_SIZE]})
-    bs.animate_array(floating_glow, 'size', 1, {0.0: [0.0], 0.25: [_RING_SIZE]})
     bs.animate(floating_ring, 'opacity', {0.0: 0.8, 0.6: 0.4, 1.2: 0.8}, loop=True)
 
     # --- به‌روزرسانی دستی موقعیت دایره‌های شناور ---
@@ -99,12 +74,10 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
         pos = node.position
         new_pos = (pos[0], pos[1] + _FLOATING_HEIGHT, pos[2])
         floating_ring.position = new_pos
-        floating_glow.position = new_pos
 
-    # ✅ رفع خطا: حذف 'with bs.Context(node)' و استفاده مستقیم از bs.Timer
-    # تایمر به صورت خودکار با مرگ کاراکتر متوقف نمی‌شود، بنابراین با owner=node
-    # آن را به گره متصل می‌کنیم تا عمر آن مدیریت شود.
-    bs.Timer(0.01, _update_floating_rings, repeat=True, owner=node)
+    # ✅ رفع خطا: حذف آرگومان owner و نگه‌داشتن تایمر در لیست سراسری
+    timer = bs.Timer(0.01, _update_floating_rings, repeat=True)
+    _active_timers.append(timer)
 
 
 # ba_meta export babase.Plugin
