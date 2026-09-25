@@ -18,6 +18,7 @@ _orig_spaz_init = PlayerSpaz.__init__
 
 _RING_COLOR = (1.0, 0.85, 0.0)  # yellow
 _RING_SIZE = 1.5  # matches the roughly torso-width ring in the reference
+_FLOATING_HEIGHT = 0.8  # ارتفاع دایره شناور از زمین (به متر)
 
 
 def _ring_spaz_init(self, *args, **kwargs) -> None:
@@ -30,7 +31,7 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
     if not node:
         return
 
-    # Crisp outline ring.
+    # --- حلقه‌ی روی زمین (مثل قبل) ---
     ring = bs.newnode(
         'locator',
         owner=node,
@@ -44,7 +45,6 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
         },
     )
 
-    # Soft filled glow underneath it.
     glow = bs.newnode(
         'locator',
         owner=node,
@@ -58,14 +58,54 @@ def _attach_ring(spaz: PlayerSpaz) -> None:
         },
     )
 
-    # Keep both rings glued to the player as they move.
     node.connectattr('position', ring, 'position')
     node.connectattr('position', glow, 'position')
 
-    # Pop in, then pulse gently forever.
-    bs.animate_array(ring, 'size', 1, {0.0: [0.0], 0.25: [_RING_SIZE]})
-    bs.animate_array(glow, 'size', 1, {0.0: [0.0], 0.25: [_RING_SIZE]})
-    bs.animate(ring, 'opacity', {0.0: 1.0, 0.6: 0.55, 1.2: 1.0}, loop=True)
+    # --- حلقه‌ی شناور جدید ---
+    floating_ring = bs.newnode(
+        'locator',
+        owner=node,
+        attrs={
+            'shape': 'circleOutline',
+            'position': node.position,
+            'color': _RING_COLOR,
+            'opacity': 0.8,
+            'draw_beauty': False,
+            'additive': True,
+        },
+    )
+
+    floating_glow = bs.newnode(
+        'locator',
+        owner=node,
+        attrs={
+            'shape': 'circle',
+            'position': node.position,
+            'color': _RING_COLOR,
+            'opacity': 0.15,
+            'draw_beauty': False,
+            'additive': True,
+        },
+    )
+
+    # انیمیشن برای دایره شناور (اختیاری، برای زیبایی بیشتر)
+    bs.animate_array(floating_ring, 'size', 1, {0.0: [0.0], 0.25: [_RING_SIZE]})
+    bs.animate_array(floating_glow, 'size', 1, {0.0: [0.0], 0.25: [_RING_SIZE]})
+    bs.animate(floating_ring, 'opacity', {0.0: 0.8, 0.6: 0.4, 1.2: 0.8}, loop=True)
+
+    # --- به‌روزرسانی دستی موقعیت دایره‌های شناور ---
+    def _update_floating_rings() -> None:
+        if not node.exists():
+            return
+        # موقعیت فعلی کاراکتر را بگیر و افست عمودی اعمال کن
+        pos = node.position
+        new_pos = (pos[0], pos[1] + _FLOATING_HEIGHT, pos[2])
+        floating_ring.position = new_pos
+        floating_glow.position = new_pos
+
+    # زمان‌بندی برای به‌روزرسانی هر فریم
+    with bs.Context(node):
+        bs.Timer(0.01, _update_floating_rings, repeat=True)
 
 
 # ba_meta export babase.Plugin
